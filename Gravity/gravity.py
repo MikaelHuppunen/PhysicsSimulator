@@ -5,6 +5,8 @@ from pygame.locals import *
 import time
 import copy
 
+save_animation = True
+file_path = "./Gravity/simulation1.txt"
 G = 6.67384e-11
 #mass of sun:1.9891e30, mass of earth:5.9e24
 mass = [1.9891e30, 1.9891e30, 5.9e24, 5.9e24, 5.9e24, 5.9e24]
@@ -17,7 +19,7 @@ position = [[-1.5210e11,0,0],[1.5210e11,0,0],[2.5e11,2.5e11,0],[2.17e11,-2.17e11
 t = 0
 scale = 1e9 #meter/pixel
 upscale = [5e1,5e1,5e2,5e2,5e2,5e2] #shown radius/real radius
-dt = 60 #time interval
+dt = 10 #time interval
 past_positions = [copy.deepcopy(position)]
 mode = 1 #0 for real time, 1 for precalculated
 simulation_duration = 1e8
@@ -34,6 +36,7 @@ def gravity(index):
     for i in range(len(mass)):
         if i != index:
             for axel in range(3):
+                #newton's law of gravity
                 acceleration[axel] += -G*mass[i]/(max(distance(position[index],position[i]), radius[index]+radius[i])**3)\
                     *(position[index][axel]-position[i][axel])
     return acceleration
@@ -96,7 +99,6 @@ while running:
     if mode == 0:
         for i in range(simulation_interval):
             approximate(dt)
-        #print(total_energy())
         for i in range(len(mass)):
             pygame.draw.circle(screen, (0,0,0), (position[i][0]/scale+400,position[i][1]/scale+350), int(upscale[i]*radius[i]/scale))
     else:
@@ -112,5 +114,8 @@ while running:
 
     pygame.display.flip()
 
+if save_animation: 
+    with open(file_path, 'w') as file:
+        file.write(str(past_positions))
+
 pygame.quit()
-plt.show()
