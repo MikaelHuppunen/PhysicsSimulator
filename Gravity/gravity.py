@@ -77,12 +77,16 @@ def total_energy():
 
 def simulate(duration, delta_t):
     global t, past_positions, simulation_interval
+    first = True
     start_time = time.time()
     while t < duration:
         for i in range(simulation_interval):
             approximate(delta_t)
         print(f"{round(t*100/duration,1)}%", end='\r')
         past_positions += [copy.deepcopy(position)]
+        if first:
+            print(past_positions)
+            first = False
     print("100")
     print(f"{time.time()-start_time}s")
 

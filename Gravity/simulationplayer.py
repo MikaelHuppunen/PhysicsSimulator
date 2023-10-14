@@ -6,14 +6,14 @@ import time
 import copy
 import json
 
-file_path = "./Gravity/simulation1.txt"
+file_path = "./Gravity/simulation2.txt"
 
 with open(file_path, 'r') as file:
     past_positions = json.loads(file.read())
 
-radius = [6.957e8, 6.957e8, 6.372e6,6.372e6,6.372e6,6.372e6]
+radius = [6.957e8, 6.957e8,6.372e6,6.957e8,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6]
 scale = 1e9 #meter/pixel
-upscale = [1e1,1e1,4e2,4e2,4e2,4e2] #shown radius/real radius
+upscale = [1e1,1e1,4e2,1e1,4e2,4e2,4e2,4e2,4e2,4e2,4e2] #shown radius/real radius
 
 pygame.init()
 
