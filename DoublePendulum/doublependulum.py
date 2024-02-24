@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pygame
 from pygame.locals import *
 
@@ -14,18 +13,14 @@ theta_2 = 1.1
 dot_theta_1 = 5
 dot_theta_2 = 5
 t = 0
-theta_1_array = [theta_1]
-theta_2_array = [theta_2]
-time = [t]
 x0 = 400
 y0 = 350
 l_multiplier = 300/(l1+l2)
 mode = 1 #0 for small angle, 1 for all angle
 plotmode = 1 #0 for over time and 1 for parametric
-fig1 = plt.figure
 
 def small_angle_approximate(angle1, angle2, delta_t):
-    global dot_theta_1, dot_theta_2, theta_1, theta_2, t, theta_1_array, theta_2_array, time
+    global dot_theta_1, dot_theta_2, theta_1, theta_2, t
     ddot_angle1 = g/(3*l)*angle2-4*g/(3*l)*angle1
     ddot_angle2 = 4*g/(3*l)*angle1-4*g/(3*l)*angle2
     dot_theta_1 += delta_t*ddot_angle1
@@ -41,12 +36,8 @@ def small_angle_approximate(angle1, angle2, delta_t):
     if theta_2 < -np.pi:
         theta_2 += 2*np.pi
     t += delta_t
-    if t < 15:
-        theta_1_array += [theta_1]
-        theta_2_array += [theta_2]
-        time += [t]
 
-def all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2):
+def all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, m1, m2):
     ddot_angle1 = -(g*(m1*np.sin(angle1)-m2*(np.cos(angle1-angle2)*np.sin(angle2)-np.sin(angle1)))+(l1*np.cos(angle1-angle2)*dot_theta_1**2+l2*dot_theta_2**2)*m2*np.sin(angle1-angle2))/(l1*(m1+m2*(np.sin(angle1-angle2))**2))
     ddot_angle2 = (g*(m1+m2)*(np.sin(angle1)*np.cos(angle1-angle2)-np.sin(angle2))+(l1*(m1+m2)*dot_theta_1**2+l2*m2*np.cos(angle1-angle2)*dot_theta_2**2)*np.sin(angle1-angle2))/(l2*(m1+m2*(np.sin(angle1-angle2))**2))
     dot_theta_1 += delta_t*ddot_angle1
@@ -62,48 +53,38 @@ def all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, 
     if angle2 < -np.pi:
         angle2 += 2*np.pi
     t += delta_t
-    if t < 15:
-        theta_1_array += [angle1]
-        theta_2_array += [angle2]
-        time += [t]
     return [angle1, angle2, dot_theta_1, dot_theta_2, t]
 
-def approximate(angle1, angle2, delta_t, mode, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2):
+def approximate(angle1, angle2, delta_t, mode, dot_theta_1, dot_theta_2, t, m1, m2):
     if mode == 0:
         small_angle_approximate(angle1, angle2, delta_t)
     if mode == 1:
-        angle1, angle2, dot_theta_1, dot_theta_2, t = all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2)
+        angle1, angle2, dot_theta_1, dot_theta_2, t = all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, m1, m2)
     
     return [angle1, angle2, dot_theta_1, dot_theta_2, t]
 
-pygame.init()
+if __name__ == "__main__":
+    pygame.init()
 
-screen = pygame.display.set_mode((800, 700))
+    screen = pygame.display.set_mode((800, 700))
 
-running = True
-while running:
-    for i in range(10):
-        theta_1, theta_2, dot_theta_1, dot_theta_2, t = approximate(theta_1, theta_2, 0.0001, mode, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2)
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-            break
-    screen.fill((255, 255, 255))
-    pos1 = (np.cos(theta_1-np.pi/2)*l1*l_multiplier+x0, -np.sin(theta_1-np.pi/2)*l1*l_multiplier+y0)
-    pygame.draw.line(screen, (0,0,0), (x0, y0), pos1, 2)
-    pygame.draw.circle(screen, (0,0,0), pos1, int(15*m1**(1/3)))
-    pos2 = (np.cos(theta_2-np.pi/2)*l2*l_multiplier+np.cos(theta_1-np.pi/2)*l1*l_multiplier+x0\
-            , -np.sin(theta_2-np.pi/2)*l2*l_multiplier-np.sin(theta_1-np.pi/2)*l1*l_multiplier+y0)
-    pygame.draw.line(screen, (0,0,0), pos1, pos2, 2)
-    pygame.draw.circle(screen, (0,0,0), pos2, int(15*m2**(1/3)))
+    running = True
+    while running:
+        for i in range(10):
+            theta_1, theta_2, dot_theta_1, dot_theta_2, t = approximate(theta_1, theta_2, 0.0001, mode, dot_theta_1, dot_theta_2, t, m1, m2)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                break
+        screen.fill((255, 255, 255))
+        pos1 = (np.cos(theta_1-np.pi/2)*l1*l_multiplier+x0, -np.sin(theta_1-np.pi/2)*l1*l_multiplier+y0)
+        pygame.draw.line(screen, (0,0,0), (x0, y0), pos1, 2)
+        pygame.draw.circle(screen, (0,0,0), pos1, int(15*m1**(1/3)))
+        pos2 = (np.cos(theta_2-np.pi/2)*l2*l_multiplier+np.cos(theta_1-np.pi/2)*l1*l_multiplier+x0\
+                , -np.sin(theta_2-np.pi/2)*l2*l_multiplier-np.sin(theta_1-np.pi/2)*l1*l_multiplier+y0)
+        pygame.draw.line(screen, (0,0,0), pos1, pos2, 2)
+        pygame.draw.circle(screen, (0,0,0), pos2, int(15*m2**(1/3)))
 
-    pygame.display.flip()
+        pygame.display.flip()
 
-if plotmode == 0:
-    plt.plot(time, theta_1_array, 'b-')
-    plt.plot(time, theta_2_array, 'r-')
-else:
-    plt.plot(theta_1_array, theta_2_array, 'g-')
-
-pygame.quit()
-plt.show()
+    pygame.quit()
