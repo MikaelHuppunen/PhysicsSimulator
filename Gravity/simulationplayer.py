@@ -12,7 +12,7 @@ with open(file_path, 'r') as file:
     past_positions = json.loads(file.read())
 
 radius = [6.957e8, 6.957e8,6.372e6,6.957e8,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6]
-scale = 1e9 #meter/pixel
+scale = 2e9 #meter/pixel
 upscale = [1e1,1e1,4e2,1e1,4e2,4e2,4e2,4e2,4e2,4e2,4e2] #shown radius/real radius
 
 pygame.init()

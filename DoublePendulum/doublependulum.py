@@ -46,33 +46,35 @@ def small_angle_approximate(angle1, angle2, delta_t):
         theta_2_array += [theta_2]
         time += [t]
 
-def all_angle_approximate(angle1, angle2, delta_t):
-    global dot_theta_1, dot_theta_2, theta_1, theta_2, t, theta_1_array, theta_2_array, time, m1, m2
+def all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2):
     ddot_angle1 = -(g*(m1*np.sin(angle1)-m2*(np.cos(angle1-angle2)*np.sin(angle2)-np.sin(angle1)))+(l1*np.cos(angle1-angle2)*dot_theta_1**2+l2*dot_theta_2**2)*m2*np.sin(angle1-angle2))/(l1*(m1+m2*(np.sin(angle1-angle2))**2))
     ddot_angle2 = (g*(m1+m2)*(np.sin(angle1)*np.cos(angle1-angle2)-np.sin(angle2))+(l1*(m1+m2)*dot_theta_1**2+l2*m2*np.cos(angle1-angle2)*dot_theta_2**2)*np.sin(angle1-angle2))/(l2*(m1+m2*(np.sin(angle1-angle2))**2))
     dot_theta_1 += delta_t*ddot_angle1
     dot_theta_2 += delta_t*ddot_angle2
-    theta_1 += delta_t*dot_theta_1
-    theta_2 += delta_t*dot_theta_2
-    if theta_1 > np.pi:
-        theta_1 -= 2*np.pi
-    if theta_2 > np.pi:
-        theta_2 -= 2*np.pi
-    if theta_1 < -np.pi:
-        theta_1 += 2*np.pi
-    if theta_2 < -np.pi:
-        theta_2 += 2*np.pi
+    angle1 += delta_t*dot_theta_1
+    angle2 += delta_t*dot_theta_2
+    if angle1 > np.pi:
+        angle1 -= 2*np.pi
+    if angle2 > np.pi:
+        angle2 -= 2*np.pi
+    if angle1 < -np.pi:
+        angle1 += 2*np.pi
+    if angle2 < -np.pi:
+        angle2 += 2*np.pi
     t += delta_t
     if t < 15:
-        theta_1_array += [theta_1]
-        theta_2_array += [theta_2]
+        theta_1_array += [angle1]
+        theta_2_array += [angle2]
         time += [t]
+    return [angle1, angle2, dot_theta_1, dot_theta_2, t]
 
-def approximate(angle1, angle2, delta_t):
+def approximate(angle1, angle2, delta_t, mode, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2):
     if mode == 0:
         small_angle_approximate(angle1, angle2, delta_t)
     if mode == 1:
-        all_angle_approximate(angle1, angle2, delta_t)
+        angle1, angle2, dot_theta_1, dot_theta_2, t = all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2)
+    
+    return [angle1, angle2, dot_theta_1, dot_theta_2, t]
 
 pygame.init()
 
@@ -81,7 +83,7 @@ screen = pygame.display.set_mode((800, 700))
 running = True
 while running:
     for i in range(10):
-        approximate(theta_1, theta_2, 0.0001)
+        theta_1, theta_2, dot_theta_1, dot_theta_2, t = approximate(theta_1, theta_2, 0.0001, mode, dot_theta_1, dot_theta_2, t, theta_1_array, theta_2_array, time, m1, m2)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -102,8 +104,6 @@ if plotmode == 0:
     plt.plot(time, theta_2_array, 'r-')
 else:
     plt.plot(theta_1_array, theta_2_array, 'g-')
-    
-plt.savefig("c4t3.png")
 
 pygame.quit()
 plt.show()
