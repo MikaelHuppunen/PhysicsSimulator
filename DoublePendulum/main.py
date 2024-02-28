@@ -23,7 +23,7 @@ args = {
     'search': True,
     'temperature': 0,
 }
-model_dict = "./DoublePendulum/models/model_0_DoublePendulum.pt"
+model_dict = "./DoublePendulum/models/model_7_DoublePendulum.pt"
 
 pygame.init()
 
@@ -31,7 +31,7 @@ screen = pygame.display.set_mode((800, 700))
 state = doublependulum.get_initial_state()
 
 running = True
-while running:
+for aaaaaaaaaaaaaaaa in range(1):
     for i in range(10):
         theta_1, theta_2, dot_theta_1, dot_theta_2, time = approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, time, doublependulum.mass1, doublependulum.mass2)
     for event in pygame.event.get():
@@ -42,7 +42,8 @@ while running:
     state = play(args, doublependulum, model_dict, state)
     screen.fill((255, 255, 255))
     ai_theta_1, ai_theta_2, ai_dot_theta_1, ai_dot_theta_2 = state[0,0], state[0,1], state[1,0], state[1,1]
-    print(ai_dot_theta_1, ai_dot_theta_2)
+    print(theta_1, theta_2, dot_theta_1, dot_theta_2)
+    print(ai_theta_1, ai_theta_2, ai_dot_theta_1, ai_dot_theta_2)
 
     pos1 = (np.cos(theta_1-np.pi/2)*doublependulum.length1*l_multiplier+x0, -np.sin(theta_1-np.pi/2)*doublependulum.length1*l_multiplier+y0)
     pygame.draw.line(screen, (0,0,0), (x0, y0), pos1, 2)

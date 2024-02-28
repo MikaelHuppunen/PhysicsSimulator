@@ -3,8 +3,8 @@ from ai import *
 args = {
     'C': 2,
     'num_searches': 1,
-    'num_iterations': 1,
-    'num_selfPlay_iterations': 1,
+    'num_iterations': 8,
+    'num_selfPlay_iterations': 1000,
     'num_parallel_systems': 100,
     'num_epochs': 4,
     'batch_size': 128,

@@ -1,5 +1,6 @@
 from doublependulum import all_angle_approximate as approximate
 import numpy as np
+
 print(np.__version__)
 
 import torch
@@ -8,7 +9,7 @@ print(torch.__version__)
 import torch.nn as nn
 import torch.nn.functional as F
 
-#torch.manual_seed(0) #set the same seed for pytorch every time to ensure reproducibility
+torch.manual_seed(0) #set the same seed for pytorch every time to ensure reproducibility
 
 import random
 import math
@@ -30,8 +31,8 @@ class DoublePendulum:
         self.row_count = 2
         self.column_count = 2
         self.action_size = self.row_count*self.column_count
-        self.max_time_steps = 10
-        self.max_angular_speed = 100000
+        self.max_time_steps = 1
+        self.max_angular_speed = 10000
 
     def __repr__(self):
         return "DoublePendulum"
@@ -41,14 +42,8 @@ class DoublePendulum:
     
     def get_next_state(self, state, action):
         state = state+action
-        while state[0,0] > np.pi:
-            state[0,0] -= 2*np.pi
-        while state[0,1] > np.pi:
-            state[0,1] -= 2*np.pi
-        while state[0,0] < -np.pi:
-            state[0,0] += 2*np.pi
-        while state[0,1] < -np.pi:
-            state[0,1] += 2*np.pi
+        state[0,0] = (state[0,0] + np.pi) % (2 * np.pi) - np.pi
+        state[0,1] = (state[0,1] + np.pi) % (2 * np.pi) - np.pi
         #limit the angular speeds from growing too much
         if state[1,0] > self.max_angular_speed:
             state[1,0] = self.max_angular_speed
@@ -73,7 +68,7 @@ class DoublePendulum:
         theta_1, theta_2, dot_theta_1, dot_theta_2 = state[0,0], state[0,1], state[1,0], state[1,1]
         for i in range(10):
             theta_1, theta_2, dot_theta_1, dot_theta_2, _ = approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, 0, self.mass1, self.mass2)
-        return np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])
+        return np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])-state
 
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_input_channels):
@@ -99,15 +94,6 @@ class ResNet(nn.Module):
             nn.Linear(32 * system.row_count * system.column_count, system.action_size) #linear transformation(input size, output size)
         )
         
-        self.valueHead = nn.Sequential(
-            nn.Conv2d(num_hidden, 3, kernel_size=3, padding=1),
-            nn.BatchNorm2d(3),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(3 * system.row_count * system.column_count, 1), #tranform to single value
-            nn.Tanh() #activation function
-        )
-        
         self.to(device) #move to the device where you want to run the operations
     
     #iterate through the neural network
@@ -116,8 +102,7 @@ class ResNet(nn.Module):
         for resBlock in self.backBone:
             x = resBlock(x)
         policy = self.policyHead(x)
-        value = self.valueHead(x)
-        return policy, value
+        return policy
         
         
 class ResBlock(nn.Module):
@@ -152,7 +137,8 @@ class AIPendulum:
         move_count = 0
         
         while True:
-            action = self.system.simulate_action(state)
+            #action = self.system.simulate_action(state)
+            action = np.array([[0,0],[0,0]])
             action_probs = action.flatten()
             
             memory.append((state, action_probs))
@@ -161,16 +147,14 @@ class AIPendulum:
 
             move_count += 1
             
-            value, is_terminal = 0, self.system.is_terminal(move_count)
+            is_terminal = self.system.is_terminal(move_count)
             
             if is_terminal:
                 returnMemory = []
                 for hist_state, hist_action_probs in memory:
-                    hist_outcome = value
                     returnMemory.append((
                         self.system.get_encoded_state(hist_state),
-                        hist_action_probs,
-                        hist_outcome
+                        hist_action_probs
                     ))
                 return returnMemory
                 
@@ -178,19 +162,18 @@ class AIPendulum:
         random.shuffle(memory)
         for batchIdx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batchIdx:min(len(memory) - 1, batchIdx + self.args['batch_size'])] # Change to memory[batchIdx:batchIdx+self.args['batch_size']] in case of an error
-            state, policy_targets, value_targets = zip(*sample)
+            state, policy_targets = zip(*sample)
             
-            state, policy_targets, value_targets = np.array(state), np.array(policy_targets), np.array(value_targets).reshape(-1, 1)
+            state, policy_targets = np.array(state), np.array(policy_targets)
             
             state = torch.tensor(state, dtype=torch.float32, device=self.model.device)
             policy_targets = torch.tensor(policy_targets, dtype=torch.float32, device=self.model.device)
-            value_targets = torch.tensor(value_targets, dtype=torch.float32, device=self.model.device)
             
-            out_policy, out_value = self.model(state)
-            
-            policy_loss = F.cross_entropy(out_policy, policy_targets)
-            value_loss = F.mse_loss(out_value, value_targets)
-            loss = policy_loss + value_loss
+            out_policy = self.model(state)
+            squared_difference = (policy_targets-out_policy) ** 2
+
+            loss = squared_difference.sum()
+            print(loss)
             
             self.optimizer.zero_grad()
             loss.backward()
@@ -231,11 +214,12 @@ def play(args, system, model_dict, state):
     model.load_state_dict(torch.load(model_dict, map_location=device))
     model.eval() #playing mode
 
-    action_probs, _ = model(
+    action_probs = model(
         torch.tensor(system.get_encoded_state(state), device=model.device).unsqueeze(0)
     )
     action_probs = action_probs.squeeze(0).cpu().numpy()
     action = action_probs.reshape(state.shape)
+    print(action)
     
     state = system.get_next_state(state, action)
 
