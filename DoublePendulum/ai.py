@@ -31,7 +31,7 @@ class DoublePendulum:
         self.row_count = 2
         self.column_count = 2
         self.action_size = self.row_count*self.column_count
-        self.max_time_steps = 1
+        self.max_time_steps = 1000
         self.max_angular_speed = 10000
 
     def __repr__(self):
@@ -137,8 +137,7 @@ class AIPendulum:
         move_count = 0
         
         while True:
-            #action = self.system.simulate_action(state)
-            action = np.array([[0,0],[0,0]])
+            action = self.system.simulate_action(state)
             action_probs = action.flatten()
             
             memory.append((state, action_probs))
@@ -173,11 +172,12 @@ class AIPendulum:
             squared_difference = (policy_targets-out_policy) ** 2
 
             loss = squared_difference.sum()
-            print(loss)
             
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+
+        print(loss.item())
     
     def learn(self):
         start = time.time()
@@ -219,7 +219,6 @@ def play(args, system, model_dict, state):
     )
     action_probs = action_probs.squeeze(0).cpu().numpy()
     action = action_probs.reshape(state.shape)
-    print(action)
     
     state = system.get_next_state(state, action)
 
