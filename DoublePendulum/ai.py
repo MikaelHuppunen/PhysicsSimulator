@@ -69,6 +69,12 @@ class DoublePendulum:
     def is_terminal(self, time_step):
         return (time_step >= self.max_time_steps)
     
+    def simulate_action(self, state):
+        theta_1, theta_2, dot_theta_1, dot_theta_2 = state[0,0], state[0,1], state[1,0], state[1,1]
+        for i in range(10):
+            theta_1, theta_2, dot_theta_1, dot_theta_2, _ = approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, 0, self.mass1, self.mass2)
+        return np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])
+
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_input_channels):
         super().__init__() #initiates the parent class
@@ -146,11 +152,8 @@ class AIPendulum:
         move_count = 0
         
         while True:
-            action_probs, _ = self.model(
-                torch.tensor(self.system.get_encoded_state(state), device=self.model.device).unsqueeze(0)
-            )
-            action_probs = action_probs.squeeze(0).cpu().numpy()
-            action = action_probs.reshape(state.shape)
+            action = self.system.simulate_action(state)
+            action_probs = action.flatten()
             
             memory.append((state, action_probs))
             
