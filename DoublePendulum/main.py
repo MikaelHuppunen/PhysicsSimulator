@@ -2,11 +2,12 @@ import pygame
 import numpy as np
 from doublependulum import all_angle_approximate as approximate
 from ai import *
+import random
 
-theta_1 = 1.3
-theta_2 = 1.1
-dot_theta_1 = 5
-dot_theta_2 = 5
+theta_1 = random.random()*2*np.pi-np.pi
+theta_2 = random.random()*2*np.pi-np.pi
+dot_theta_1 = random.random()*10-5
+dot_theta_2 = random.random()*10-5
 
 doublependulum = DoublePendulum()
 
@@ -28,7 +29,7 @@ model_dict = "./DoublePendulum/models/model_7_DoublePendulum.pt"
 pygame.init()
 
 screen = pygame.display.set_mode((800, 700))
-state = doublependulum.get_initial_state()
+state = np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])
 
 running = True
 for aaaaaaaaaaaaaaaa in range(1000):

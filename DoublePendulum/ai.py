@@ -1,5 +1,6 @@
 from doublependulum import all_angle_approximate as approximate
 import numpy as np
+import random
 
 print(np.__version__)
 
@@ -38,7 +39,13 @@ class DoublePendulum:
         return "DoublePendulum"
     
     def get_initial_state(self):
-        return np.array([[1.3,1.1],[5.0,5.0]])
+        theta_1 = random.random()*2*np.pi-np.pi
+        theta_2 = random.random()*2*np.pi-np.pi
+        dot_theta_1 = random.random()*10-5
+        dot_theta_2 = random.random()*10-5
+        state = np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])
+        
+        return state
     
     def get_next_state(self, state, action):
         state = state+action
