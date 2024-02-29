@@ -17,12 +17,8 @@ y0 = 350
 l_multiplier = 300/(doublependulum.length1+doublependulum.length2)
 
 args = {
-    'C': 2,
     'num_searches': 5000,
-    'dirichlet_epsilon': 0.1,
-    'dirichlet_alpha': 0.3,
     'search': True,
-    'temperature': 0,
 }
 model_dict = "./DoublePendulum/models/model_7_DoublePendulum.pt"
 
