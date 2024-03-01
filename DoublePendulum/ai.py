@@ -73,7 +73,7 @@ class DoublePendulum:
     
     def simulate_action(self, state):
         theta_1, theta_2, dot_theta_1, dot_theta_2 = state[0,0], state[0,1], state[1,0], state[1,1]
-        for i in range(10):
+        for i in range(100):
             theta_1, theta_2, dot_theta_1, dot_theta_2, _ = approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, 0, self.mass1, self.mass2)
         return np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])-state
 

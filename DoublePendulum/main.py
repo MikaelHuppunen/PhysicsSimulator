@@ -17,7 +17,6 @@ y0 = 350
 l_multiplier = 300/(doublependulum.length1+doublependulum.length2)
 
 args = {
-    'num_searches': 5000,
     'search': True,
 }
 model_dict = "./DoublePendulum/models/model_7_DoublePendulum.pt"
@@ -30,7 +29,7 @@ state = np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])
 running = True
 for aaaaaaaaaaaaaaaa in range(1000):
     ptheta_1, ptheta_2, pdot_theta_1, pdot_theta_2 = theta_1, theta_2, dot_theta_1, dot_theta_2
-    for i in range(10):
+    for i in range(100):
         theta_1, theta_2, dot_theta_1, dot_theta_2, time = approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, time, doublependulum.mass1, doublependulum.mass2)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
