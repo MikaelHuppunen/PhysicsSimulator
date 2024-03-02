@@ -1,6 +1,6 @@
 import pygame
 import numpy as np
-from doublependulum import all_angle_approximate as approximate
+from doublependulum import approximate
 from ai import *
 import random
 

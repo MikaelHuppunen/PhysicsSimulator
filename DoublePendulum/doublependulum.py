@@ -44,6 +44,13 @@ def all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, 
     dot_theta_2 += delta_t*ddot_angle2
     angle1 += delta_t*dot_theta_1
     angle2 += delta_t*dot_theta_2
+    return [angle1, angle2, dot_theta_1, dot_theta_2]
+
+def approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, time, m1, m2, mode = 1):
+    if mode == 0:
+        small_angle_approximate(angle1, angle2, delta_t)
+    if mode == 1:
+        angle1, angle2, dot_theta_1, dot_theta_2 = all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, m1, m2)
     if angle1 > np.pi:
         angle1 -= 2*np.pi
     if angle2 > np.pi:
@@ -52,16 +59,9 @@ def all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, 
         angle1 += 2*np.pi
     if angle2 < -np.pi:
         angle2 += 2*np.pi
-    t += delta_t
-    return [angle1, angle2, dot_theta_1, dot_theta_2, t]
+    time += delta_t
 
-def approximate(angle1, angle2, delta_t, mode, dot_theta_1, dot_theta_2, t, m1, m2):
-    if mode == 0:
-        small_angle_approximate(angle1, angle2, delta_t)
-    if mode == 1:
-        angle1, angle2, dot_theta_1, dot_theta_2, t = all_angle_approximate(angle1, angle2, delta_t, dot_theta_1, dot_theta_2, t, m1, m2)
-    
-    return [angle1, angle2, dot_theta_1, dot_theta_2, t]
+    return [angle1, angle2, dot_theta_1, dot_theta_2, time]
 
 if __name__ == "__main__":
     pygame.init()

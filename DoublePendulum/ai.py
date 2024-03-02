@@ -1,4 +1,4 @@
-from doublependulum import all_angle_approximate as approximate
+from doublependulum import all_angle_approximate
 import numpy as np
 import random
 
@@ -74,7 +74,7 @@ class DoublePendulum:
     def simulate_action(self, state):
         theta_1, theta_2, dot_theta_1, dot_theta_2 = state[0,0], state[0,1], state[1,0], state[1,1]
         for i in range(100):
-            theta_1, theta_2, dot_theta_1, dot_theta_2, _ = approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, 0, self.mass1, self.mass2)
+            theta_1, theta_2, dot_theta_1, dot_theta_2 = all_angle_approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, 0, self.mass1, self.mass2)
         return np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])-state
 
 class ResNet(nn.Module):
@@ -145,9 +145,8 @@ class AIPendulum:
         
         while True:
             action = self.system.simulate_action(state)
-            action_probs = action.flatten()
             
-            memory.append((state, action_probs))
+            memory.append((state, action.flatten()))
             
             state = self.system.get_next_state(state, action)
 
@@ -157,10 +156,10 @@ class AIPendulum:
             
             if is_terminal:
                 returnMemory = []
-                for hist_state, hist_action_probs in memory:
+                for hist_state, hist_action in memory:
                     returnMemory.append((
                         self.system.get_encoded_state(hist_state),
-                        hist_action_probs
+                        hist_action
                     ))
                 return returnMemory
                 
