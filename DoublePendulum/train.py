@@ -1,10 +1,10 @@
 from ai import *
 
 args = {
-    'num_iterations': 8,
-    'num_selfPlay_iterations': 2048,
+    'num_iterations': 1,
+    'num_selfPlay_iterations': 4096,
     'num_parallel_systems': 100,
-    'num_epochs': 4,
+    'num_epochs': 32,
     'batch_size': 128
 }
 

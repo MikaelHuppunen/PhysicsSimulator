@@ -32,7 +32,7 @@ class DoublePendulum:
         self.row_count = 2
         self.column_count = 2
         self.action_size = self.row_count*self.column_count
-        self.max_time_steps = 1000
+        self.max_time_steps = 2000
         self.max_angular_speed = 10000
 
     def __repr__(self):
