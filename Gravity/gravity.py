@@ -10,16 +10,16 @@ follow_center_off_mass = True
 file_path = "./Gravity/simulation1.txt"
 G = 6.67384e-11
 #mass of sun:1.9891e30, mass of earth:5.9e24
-mass = [1.9891e30, 1.9891e30,5.9e24, 1.9891e30, 5.9e24, 5.9e24,5.9e24,5.9e24,5.9e24,5.9e24,5.9e24]
+mass = [1.9891e30,5.9e24]
 #mass of sun:6.957e8, mass of earth:6.372e6
-radius = [6.957e8, 6.957e8,6.372e6,6.957e8,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6,6.372e6]
+radius = [6.957e8,6.372e6]
 #aphelion velocity 2.929e4
-velocity = [[0,-1e4,0],[0,1e4,0],[-2e4,2e4,0],[-2e4,-2e4,0],[2e4,2e4,0],[2e4,-2e4,0],[-2e4,2e4,0],[-2e4,2e4,0],[-2e4,2e4,0],[-2e4,2e4,0],[-2e4,2e4,0]]
+velocity = [[0,0,0],[0,2.929e4,0]]
 #aphelion distance 1.5210e11
-position = [[-1.5210e11,0,0],[1.5210e11,0,0],[2.5e11,2.5e11,0],[2.17e11,-2.17e11,0],[-1.8510e11,1.8510e11,0],[-1.5210e11,-1.5210e11,0],[2.6e11,2.5e11,0],[2.5e11,2.6e11,0],[2.6e11,2.6e11,0],[2.6e11,2.7e11,0],[2.7e11,2.6e11,0]]
+position = [[0,0,0],[1.5210e11,0,0]]
 t = 0
 scale = 1e9 #meter/pixel
-upscale = [1e1,1e1,4e2,1e1,4e2,4e2,4e2,4e2,4e2,4e2,4e2] #shown radius/real radius
+upscale = [1e1,4e2] #shown radius/real radius
 dt = 60 #time interval
 past_positions = [copy.deepcopy(position)]
 mode = 1 #0 for real time, 1 for precalculated
