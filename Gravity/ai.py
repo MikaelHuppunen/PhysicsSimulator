@@ -29,6 +29,9 @@ class Space:
         self.max_time_steps = 2000
         self.grid_width = 4e11
         self.meters_per_pixel = self.grid_width/self.column_count
+        self.max_mass = 1e40
+        self.speed_of_light = 299792458.0
+        self.dimensions = 2
 
     def __repr__(self):
         return "Space"
@@ -40,14 +43,33 @@ class Space:
 
         return mass_grid
     
+    def get_initial_momentum_state(self):
+        mass = [1.9891e30,5.9e24,0.001]
+        position = [[2e11,2e11],[3.5210e11,2e11],[0,0]]
+        velocity = [[0,0],[0,2.929e4],[0,0]]
+        momentum_grid = self.get_momentum_grid(mass, position, velocity)
+
+        return momentum_grid
+    
     def get_mass_grid(self, mass, position):
         mass_grid = np.zeros((self.row_count, self.column_count))
         for i in range(len(mass)):
             x, y = int(position[i][0]/self.meters_per_pixel),int(position[i][1]/self.meters_per_pixel)
             if x < self.column_count and y < self.row_count:
-                mass_grid[y,x] += mass[i]
+                mass_grid[y,x] += np.log(mass[i])/np.log(self.max_mass)
         
         return mass_grid
+    
+    def get_momentum_grid(self, mass, position, velocity):
+        momentum_grid = []
+        for i in range(self.dimensions):
+            momentum_grid += [np.ones((self.row_count, self.column_count))/2]
+            for j in range(len(mass)):
+                x, y = int(position[j][0]/self.meters_per_pixel),int(position[j][1]/self.meters_per_pixel)
+                if x < self.column_count and y < self.row_count:
+                    momentum_grid[i][y,x] += (np.sign(velocity[j][i])*np.log10(mass[j]*abs(velocity[j][i])+1)/np.log10(self.max_mass*self.speed_of_light))/2
+        
+        return np.array(momentum_grid)
     
     def get_encoded_state(self, state):
         encoded_state = np.array([state]).astype(np.float32)
