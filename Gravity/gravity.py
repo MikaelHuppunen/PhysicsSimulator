@@ -8,7 +8,7 @@ import copy
 save_animation = False
 follow_center_off_mass = True
 file_path = "./Gravity/simulation1.txt"
-G = 6.67384e-11
+gravitational_constant = 6.67384e-11
 #mass of sun:1.9891e30, mass of earth:5.9e24
 mass = [1.9891e30,5.9e24]
 #mass of sun:6.957e8, mass of earth:6.372e6
@@ -20,10 +20,10 @@ position = [[0,0,0],[1.5210e11,0,0]]
 t = 0
 scale = 1e9 #meter/pixel
 upscale = [1e1,4e2] #shown radius/real radius
-dt = 60 #time interval
+dt = 600 #time interval
 past_positions = [copy.deepcopy(position)]
 mode = 1 #0 for real time, 1 for precalculated
-simulation_duration = 1e8
+simulation_duration = 5e7
 time_multiplier = 5e6
 simulation_interval = max(1,int(time_multiplier/(60*dt)))
 print(f"time multiplier: {round(60*dt*simulation_interval,1)}")
@@ -46,42 +46,40 @@ if follow_center_off_mass:
 def distance(coordinate1, coordinate2):
     return np.sqrt((coordinate1[0]-coordinate2[0])**2+(coordinate1[1]-coordinate2[1])**2+(coordinate1[2]-coordinate2[2])**2)
 
-def gravity(index):
-    global mass, G, position
+def gravity(index, gravitational_constant, mass, position):
     acceleration = [0,0,0]
     for i in range(len(mass)):
         if i != index:
             for axel in range(3):
                 #newton's law of gravity
-                acceleration[axel] += -G*mass[i]/(max(distance(position[index],position[i]), radius[index]+radius[i])**3)\
+                acceleration[axel] += -gravitational_constant*mass[i]/(max(distance(position[index],position[i]), radius[index]+radius[i])**3)\
                     *(position[index][axel]-position[i][axel])
     return acceleration
 
 
-def approximate(delta_t):
-    global mass, velocity, position, t
+def approximate(delta_t, mass, velocity, position, gravitational_constant):
     for i in range(len(mass)):
-        acceleration = gravity(i)
+        acceleration = gravity(i, gravitational_constant, mass, position)
         for axel in range(3):
             velocity[i][axel] += delta_t*acceleration[axel]
             position[i][axel] += delta_t*velocity[i][axel]
-    t += delta_t
 
 def total_energy():
     energy = 0
     for i in range(len(mass)):
         energy += 1/2*mass[i]*(velocity[i][0]**2+velocity[i][1]**2+velocity[i][2]**2)
         for j in range(len(mass)-i-1):
-            energy += -G*mass[i]*mass[i+j+1]/(distance(position[i],position[i+j+1]))
+            energy += -gravitational_constant*mass[i]*mass[i+j+1]/(distance(position[i],position[i+j+1]))
     return energy
 
 def simulate(duration, delta_t):
-    global t, past_positions, simulation_interval
+    global t, past_positions, simulation_interval, mass, velocity, position, gravitational_constant
     first = True
     start_time = time.time()
     while t < duration:
         for i in range(simulation_interval):
-            approximate(delta_t)
+            approximate(delta_t, mass, velocity, position, gravitational_constant)
+            t += delta_t
         print(f"{round(t*100/duration,1)}%", end='\r')
         past_positions += [copy.deepcopy(position)]
         if first:
@@ -118,7 +116,8 @@ while running:
     screen.fill((255, 255, 255))
     if mode == 0:
         for i in range(simulation_interval):
-            approximate(dt)
+            approximate(dt, mass, velocity, position, gravitational_constant)
+            t += dt
         for i in range(len(mass)):
             pygame.draw.circle(screen, (0,0,0), (position[i][0]/scale+400,position[i][1]/scale+350), int(upscale[i]*radius[i]/scale))
     else:
