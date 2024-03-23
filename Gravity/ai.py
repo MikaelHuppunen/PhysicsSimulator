@@ -32,24 +32,26 @@ class Space:
         self.max_mass = 1e40
         self.speed_of_light = 299792458.0
         self.dimensions = 2
+        self.time_step = 600
 
     def __repr__(self):
         return "Space"
     
-    def get_initial_mass_state(self):
+    def get_initial_mass(self):
         mass = [1.9891e30,5.9e24]
-        position = [[2e11,2e11],[3.5210e11,2e11]]
-        mass_grid = self.get_mass_grid(mass, position)
-
-        return mass_grid
+        return mass
     
-    def get_initial_momentum_state(self):
-        mass = [1.9891e30,5.9e24,0.001]
-        position = [[2e11,2e11],[3.5210e11,2e11],[0,0]]
-        velocity = [[0,0],[0,2.929e4],[0,0]]
-        momentum_grid = self.get_momentum_grid(mass, position, velocity)
-
-        return momentum_grid
+    def get_initial_position(self):
+        position = [[2e11,2e11,0],[3.5210e11,2e11,0]]
+        return position
+    
+    def get_initial_velocity(self):
+        velocity = [[0,0,0],[0,2.929e4,0]]
+        return velocity
+    
+    def get_initial_radius(self):   
+        radius = [6.957e8,6.372e6]
+        return radius
     
     def get_mass_grid(self, mass, position):
         mass_grid = np.zeros((self.row_count, self.column_count))
