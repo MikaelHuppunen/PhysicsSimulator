@@ -168,6 +168,7 @@ class GravityAI:
             memory.append((mass_grid, action.flatten()))
 
             mass_grid = mass_grid + action
+            mass_grid = np.clip(mass_grid, 0, 1)
 
             time_step_count += 1
             
@@ -219,8 +220,8 @@ class GravityAI:
                 self.train(memory)
                 print(f"{100*(epoch+1)/self.args['num_epochs']}%")
             
-            torch.save(self.model.state_dict(), f"./DoublePendulum/models/model_{iteration}_{self.system}.pt")
-            torch.save(self.optimizer.state_dict(), f"./DoublePendulum/models/optimizer_{iteration}_{self.system}.pt")
+            torch.save(self.model.state_dict(), f"./Gravity/models/model_{iteration}_{self.system}.pt")
+            torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
     model = ResNet(system, 4, 64, device=device, number_of_input_channels=1)
@@ -232,7 +233,7 @@ def learn(args, system):
     print(f"learning time: {time.time()-start_time}s")
 
 @torch.no_grad()
-def play(args, system, model_dict, state):
+def play(args, system, model_dict, mass_grid):
     model = ResNet(system, 4, 64, device=device, number_of_input_channels=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
@@ -240,11 +241,12 @@ def play(args, system, model_dict, state):
     model.eval() #playing mode
 
     action_probs = model(
-        torch.tensor(system.get_encoded_state(state), device=model.device).unsqueeze(0)
+        torch.tensor(system.get_encoded_state(mass_grid), device=model.device).unsqueeze(0)
     )
     action_probs = action_probs.squeeze(0).cpu().numpy()
-    action = action_probs.reshape(state.shape)
+    action = action_probs.reshape(mass_grid.shape)
     
-    state = system.get_next_state(state, action)
+    mass_grid = mass_grid + action
+    mass_grid = np.clip(mass_grid, 0, 1)
 
-    return state
+    return mass_grid

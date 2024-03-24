@@ -27,6 +27,11 @@ momentum_grid = space.get_momentum_grid(mass, position, velocity)
 mass_grid = space.get_mass_grid(mass, position)
 momentum_grid = space.get_momentum_grid(mass, position, velocity)
 
+args = {
+    'search': True,
+}
+model_dict = "./Gravity/models/model_0_Space.pt"
+
 pygame.init()
 
 width, height = 800, 700
@@ -58,8 +63,9 @@ while running:
             break
     screen.fill((255, 255, 255))
     draw_mass_grid(space, mass_grid, width, height)
-    space.simulate_next_state(mass, velocity, position, radius)
-    mass_grid = space.get_mass_grid(mass, position)
+    #space.simulate_next_state(mass, velocity, position, radius)
+    #mass_grid = space.get_mass_grid(mass, position)
+    mass_grid = ai.play(args, space, model_dict, mass_grid)
 
     pygame.display.flip()
 
