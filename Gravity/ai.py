@@ -27,7 +27,7 @@ class Space:
         self.row_count = 10
         self.column_count = 10
         self.action_size = self.row_count*self.column_count
-        self.max_time_steps = 10
+        self.max_time_steps = 100
         self.grid_width = 4e11
         self.meters_per_pixel = self.grid_width/self.column_count
         self.max_mass = 1e40
@@ -250,10 +250,10 @@ class GravityAI:
                 print(f"{100*(epoch+1)/self.args['num_epochs']}%")
             
             torch.save(self.model.state_dict(), f"./Gravity/models/model_{iteration}_{self.system}.pt")
-            torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
+            #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 4, 64, device=device, number_of_input_channels=3)
+    model = ResNet(system, 4, 256, device=device, number_of_input_channels=3)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -263,7 +263,7 @@ def learn(args, system):
 
 @torch.no_grad()
 def play(args, system, model_dict, mass_grid, momentum_grid):
-    model = ResNet(system, 4, 64, device=device, number_of_input_channels=3)
+    model = ResNet(system, 4, 256, device=device, number_of_input_channels=3)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
