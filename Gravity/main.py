@@ -51,15 +51,14 @@ def draw_mass_grid(space, mass_grid, width, height):
 
 running = True
 while running:
-    pygame.time.Clock().tick(60)
+    pygame.time.Clock().tick(6)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
             break
     screen.fill((255, 255, 255))
     draw_mass_grid(space, mass_grid, width, height)
-    for i in range(1000):
-        approximate(space.time_step, mass, velocity, position, radius, space.gravitational_constant)
+    space.simulate_next_state(mass, velocity, position, radius)
     mass_grid = space.get_mass_grid(mass, position)
 
     pygame.display.flip()

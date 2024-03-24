@@ -14,6 +14,7 @@ torch.manual_seed(0) #set the same seed for pytorch every time to ensure reprodu
 import random
 import math
 import time
+from gravity import approximate
 
 def print_policy_heatmap(policy):
     for i in range(0, 64, 8):
@@ -26,7 +27,7 @@ class Space:
         self.row_count = 10
         self.column_count = 10
         self.action_size = self.row_count*self.column_count
-        self.max_time_steps = 2000
+        self.max_time_steps = 2
         self.grid_width = 4e11
         self.meters_per_pixel = self.grid_width/self.column_count
         self.max_mass = 1e40
@@ -81,11 +82,15 @@ class Space:
     def is_terminal(self, time_step):
         return (time_step >= self.max_time_steps)
     
-    def simulate_action(self, state):
-        theta_1, theta_2, dot_theta_1, dot_theta_2 = state[0,0], state[0,1], state[1,0], state[1,1]
-        for i in range(100):
-            theta_1, theta_2, dot_theta_1, dot_theta_2 = all_angle_approximate(theta_1, theta_2, 0.0001, dot_theta_1, dot_theta_2, 0, self.mass1, self.mass2)
-        return np.array([[theta_1, theta_2],[dot_theta_1, dot_theta_2]])-state
+    def simulate_next_state(self, mass, velocity, position, radius):
+        for i in range(5000):
+            approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
+
+    def simulate_action(self, mass, velocity, position, radius, mass_grid):
+        self.simulate_next_state(mass, velocity, position, radius)
+        new_mass_grid = self.get_mass_grid(mass, position)
+        action = new_mass_grid-mass_grid
+        return action
 
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_input_channels):
@@ -140,7 +145,7 @@ class ResBlock(nn.Module):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-class AIPendulum:
+class GravityAI:
     def __init__(self, model, optimizer, system, args):
         self.model = model
         self.optimizer = optimizer
@@ -148,27 +153,31 @@ class AIPendulum:
         self.args = args
 
     @torch.no_grad() 
-    def selfPlay(self):
+    def simulation(self):
         memory = []
-        state = self.system.get_initial_state()
-        move_count = 0
+        mass = self.system.get_initial_mass()
+        position = self.system.get_initial_position()
+        velocity = self.system.get_initial_velocity()
+        radius = self.system.get_initial_radius()
+        mass_grid = self.system.get_mass_grid(mass, position)
+        time_step_count = 0
         
         while True:
-            action = self.system.simulate_action(state)
+            action = self.system.simulate_action(mass, velocity, position, radius, mass_grid)
             
-            memory.append((state, action.flatten()))
-            
-            state = self.system.get_next_state(state, action)
+            memory.append((mass_grid, action.flatten()))
 
-            move_count += 1
+            mass_grid = mass_grid + action
+
+            time_step_count += 1
             
-            is_terminal = self.system.is_terminal(move_count)
+            is_terminal = self.system.is_terminal(time_step_count)
             
             if is_terminal:
                 returnMemory = []
-                for hist_state, hist_action in memory:
+                for hist_mass_grid, hist_action in memory:
                     returnMemory.append((
-                        self.system.get_encoded_state(hist_state),
+                        self.system.get_encoded_state(hist_mass_grid),
                         hist_action
                     ))
                 return returnMemory
@@ -177,14 +186,14 @@ class AIPendulum:
         random.shuffle(memory)
         for batchIdx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batchIdx:min(len(memory) - 1, batchIdx + self.args['batch_size'])] # Change to memory[batchIdx:batchIdx+self.args['batch_size']] in case of an error
-            state, policy_targets = zip(*sample)
+            mass_grid, policy_targets = zip(*sample)
             
-            state, policy_targets = np.array(state), np.array(policy_targets)
+            mass_grid, policy_targets = np.array(mass_grid), np.array(policy_targets)
             
-            state = torch.tensor(state, dtype=torch.float32, device=self.model.device)
+            mass_grid = torch.tensor(mass_grid, dtype=torch.float32, device=self.model.device)
             policy_targets = torch.tensor(policy_targets, dtype=torch.float32, device=self.model.device)
             
-            out_policy = self.model(state)
+            out_policy = self.model(mass_grid)
             squared_difference = (policy_targets-out_policy) ** 2
 
             loss = squared_difference.sum()
@@ -201,9 +210,9 @@ class AIPendulum:
             memory = []
             
             self.model.eval()
-            for selfPlay_iteration in range(self.args['num_selfPlay_iterations']):
-                memory += self.selfPlay()
-                print(f"{iteration+1}/{self.args['num_iterations']}: {100*(selfPlay_iteration+1)/self.args['num_selfPlay_iterations']}%, estimated time left: {round((time.time()-start)*(self.args['num_iterations']*self.args['num_selfPlay_iterations']-iteration*self.args['num_selfPlay_iterations']-selfPlay_iteration-1+0.01)/(iteration*self.args['num_selfPlay_iterations']+selfPlay_iteration+1+0.01),2)}s")
+            for selfPlay_iteration in range(self.args['num_simulation_iterations']):
+                memory += self.simulation()
+                print(f"{iteration+1}/{self.args['num_iterations']}: {100*(selfPlay_iteration+1)/self.args['num_simulation_iterations']}%, estimated time left: {round((time.time()-start)*(self.args['num_iterations']*self.args['num_simulation_iterations']-iteration*self.args['num_simulation_iterations']-selfPlay_iteration-1+0.01)/(iteration*self.args['num_simulation_iterations']+selfPlay_iteration+1+0.01),2)}s")
                 
             self.model.train()
             for epoch in range(self.args['num_epochs']):
@@ -217,9 +226,9 @@ def learn(args, system):
     model = ResNet(system, 4, 64, device=device, number_of_input_channels=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
-    aipendulum = AIPendulum(model, optimizer, system, args)
+    gravityai = GravityAI(model, optimizer, system, args)
     start_time = time.time()
-    aipendulum.learn()
+    gravityai.learn()
     print(f"learning time: {time.time()-start_time}s")
 
 @torch.no_grad()
