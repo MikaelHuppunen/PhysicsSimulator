@@ -24,8 +24,8 @@ def print_policy_heatmap(policy):
 class Space:
     def __init__(self):
         self.gravitational_constant = 6.67384e-11
-        self.row_count = 10
-        self.column_count = 10
+        self.row_count = 20
+        self.column_count = 20
         self.action_size = self.row_count*self.column_count
         self.max_time_steps = 100
         self.grid_width = 4e11
@@ -83,7 +83,7 @@ class Space:
         return (time_step >= self.max_time_steps)
     
     def simulate_next_state(self, mass, velocity, position, radius):
-        for i in range(5000):
+        for i in range(2500):
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
 
     def simulate_action(self, mass, velocity, position, radius, mass_grid, momentum_grid):
