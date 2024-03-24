@@ -65,7 +65,7 @@ while running:
     draw_mass_grid(space, mass_grid, width, height)
     #space.simulate_next_state(mass, velocity, position, radius)
     #mass_grid = space.get_mass_grid(mass, position)
-    mass_grid = ai.play(args, space, model_dict, mass_grid)
+    mass_grid = ai.play(args, space, model_dict, mass_grid, momentum_grid)
 
     pygame.display.flip()
 

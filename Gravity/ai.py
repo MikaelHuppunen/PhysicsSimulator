@@ -74,8 +74,8 @@ class Space:
         
         return np.array(momentum_grid)
     
-    def get_encoded_state(self, state):
-        encoded_state = np.array([state]).astype(np.float32)
+    def get_encoded_state(self, mass_grid, momentum_grid0, momentum_grid1):
+        encoded_state = np.array([mass_grid, momentum_grid0, momentum_grid1]).astype(np.float32)
         
         return encoded_state
     
@@ -183,7 +183,7 @@ class GravityAI:
                 returnMemory = []
                 for hist_mass_grid, hist_momentum_grid0, hist_momentum_grid1, hist_mass_action, hist_momentum_action0, hist_momentum_action1 in memory:
                     returnMemory.append((
-                        self.system.get_encoded_state(hist_mass_grid),
+                        self.system.get_encoded_state(hist_mass_grid, hist_momentum_grid0, hist_momentum_grid1),
                         hist_mass_action,
                         hist_momentum_action0,
                         hist_momentum_action1
@@ -233,7 +233,7 @@ class GravityAI:
             torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 4, 64, device=device, number_of_input_channels=1)
+    model = ResNet(system, 4, 64, device=device, number_of_input_channels=3)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -242,15 +242,15 @@ def learn(args, system):
     print(f"learning time: {time.time()-start_time}s")
 
 @torch.no_grad()
-def play(args, system, model_dict, mass_grid):
-    model = ResNet(system, 4, 64, device=device, number_of_input_channels=1)
+def play(args, system, model_dict, mass_grid, momentum_grid):
+    model = ResNet(system, 4, 64, device=device, number_of_input_channels=3)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
     model.eval() #playing mode
 
     action_probs = model(
-        torch.tensor(system.get_encoded_state(mass_grid), device=model.device).unsqueeze(0)
+        torch.tensor(system.get_encoded_state(mass_grid, momentum_grid[0], momentum_grid[1]), device=model.device).unsqueeze(0)
     )
     action_probs = action_probs.squeeze(0).cpu().numpy()
     action = action_probs.reshape(mass_grid.shape)
