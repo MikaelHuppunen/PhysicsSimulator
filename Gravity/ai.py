@@ -110,7 +110,23 @@ class ResNet(nn.Module):
             [ResBlock(num_hidden) for i in range(num_resBlocks)]
         )
         
-        self.policyHead = nn.Sequential(
+        self.policyHead_mass = nn.Sequential(
+            nn.Conv2d(num_hidden, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Flatten(), #takes each element from a tensor to an array
+            nn.Linear(32 * system.row_count * system.column_count, system.action_size) #linear transformation(input size, output size)
+        )
+
+        self.policyHead_momentum0 = nn.Sequential(
+            nn.Conv2d(num_hidden, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Flatten(), #takes each element from a tensor to an array
+            nn.Linear(32 * system.row_count * system.column_count, system.action_size) #linear transformation(input size, output size)
+        )
+
+        self.policyHead_momentum1 = nn.Sequential(
             nn.Conv2d(num_hidden, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
@@ -125,8 +141,10 @@ class ResNet(nn.Module):
         x = self.startBlock(x)
         for resBlock in self.backBone:
             x = resBlock(x)
-        policy = self.policyHead(x)
-        return policy
+        mass_policy = self.policyHead_mass(x)
+        momentum_policy0 = self.policyHead_momentum0(x)
+        momentum_policy1 = self.policyHead_momentum1(x)
+        return mass_policy, momentum_policy0, momentum_policy1
         
         
 class ResBlock(nn.Module):
@@ -203,10 +221,12 @@ class GravityAI:
             momentum_policy_targets0 = torch.tensor(momentum_policy_targets0, dtype=torch.float32, device=self.model.device)
             momentum_policy_targets1 = torch.tensor(momentum_policy_targets1, dtype=torch.float32, device=self.model.device)
             
-            out_policy = self.model(state)
-            squared_difference = (mass_policy_targets-out_policy) ** 2
+            out_mass_policy, out_momentum_policy0, out_momentum_policy1 = self.model(state)
+            mass_squared_difference = (mass_policy_targets-out_mass_policy) ** 2
+            momentum_squared_difference0 = (momentum_policy_targets0-out_momentum_policy0) ** 2
+            momentum_squared_difference1 = (momentum_policy_targets1-out_momentum_policy1) ** 2
 
-            loss = squared_difference.sum()
+            loss = mass_squared_difference.sum() + momentum_squared_difference0.sum() + momentum_squared_difference1.sum()
             
             self.optimizer.zero_grad()
             loss.backward()
@@ -249,13 +269,19 @@ def play(args, system, model_dict, mass_grid, momentum_grid):
     model.load_state_dict(torch.load(model_dict, map_location=device))
     model.eval() #playing mode
 
-    action_probs = model(
+    mass_action_probs, momentum_action_probs0, momentum_action_probs1 = model(
         torch.tensor(system.get_encoded_state(mass_grid, momentum_grid[0], momentum_grid[1]), device=model.device).unsqueeze(0)
     )
-    action_probs = action_probs.squeeze(0).cpu().numpy()
-    action = action_probs.reshape(mass_grid.shape)
+    mass_action_probs = mass_action_probs.squeeze(0).cpu().numpy()
+    momentum_action_probs0 = momentum_action_probs0.squeeze(0).cpu().numpy()
+    momentum_action_probs1 = momentum_action_probs1.squeeze(0).cpu().numpy()
+    mass_action = mass_action_probs.reshape(mass_grid.shape)
+    momentum_action0 = momentum_action_probs0.reshape(momentum_grid[0].shape)
+    momentum_action1 = momentum_action_probs1.reshape(momentum_grid[1].shape)
     
-    mass_grid = mass_grid + action
+    mass_grid = mass_grid + mass_action
+    momentum_grid = momentum_grid + np.array([momentum_action0, momentum_action1])
     mass_grid = np.clip(mass_grid, 0, 1)
+    momentum_grid = np.clip(momentum_grid, 0, 1)
 
-    return mass_grid
+    return mass_grid, momentum_grid
