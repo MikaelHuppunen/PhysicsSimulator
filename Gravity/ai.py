@@ -27,7 +27,7 @@ class Space:
         self.row_count = 10
         self.column_count = 10
         self.action_size = self.row_count*self.column_count
-        self.max_time_steps = 2
+        self.max_time_steps = 10
         self.grid_width = 4e11
         self.meters_per_pixel = self.grid_width/self.column_count
         self.max_mass = 1e40
@@ -86,11 +86,13 @@ class Space:
         for i in range(5000):
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
 
-    def simulate_action(self, mass, velocity, position, radius, mass_grid):
+    def simulate_action(self, mass, velocity, position, radius, mass_grid, momentum_grid):
         self.simulate_next_state(mass, velocity, position, radius)
         new_mass_grid = self.get_mass_grid(mass, position)
-        action = new_mass_grid-mass_grid
-        return action
+        new_momentum_grid = self.get_momentum_grid(mass, position, velocity)
+        mass_action = new_mass_grid-mass_grid
+        momentum_action = new_momentum_grid-momentum_grid
+        return mass_action, momentum_action
 
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_input_channels):
@@ -160,15 +162,18 @@ class GravityAI:
         velocity = self.system.get_initial_velocity()
         radius = self.system.get_initial_radius()
         mass_grid = self.system.get_mass_grid(mass, position)
+        momentum_grid = self.system.get_momentum_grid(mass, position, velocity)
         time_step_count = 0
         
         while True:
-            action = self.system.simulate_action(mass, velocity, position, radius, mass_grid)
+            mass_action, momentum_action = self.system.simulate_action(mass, velocity, position, radius, mass_grid, momentum_grid)
             
-            memory.append((mass_grid, action.flatten()))
+            memory.append((mass_grid, momentum_grid[0], momentum_grid[1], mass_action.flatten(), momentum_action[0].flatten(), momentum_action[1].flatten()))
 
-            mass_grid = mass_grid + action
+            mass_grid = mass_grid + mass_action
+            momentum_grid = momentum_grid + momentum_action
             mass_grid = np.clip(mass_grid, 0, 1)
+            momentum_grid = np.clip(momentum_grid, 0, 1)
 
             time_step_count += 1
             
@@ -176,10 +181,12 @@ class GravityAI:
             
             if is_terminal:
                 returnMemory = []
-                for hist_mass_grid, hist_action in memory:
+                for hist_mass_grid, hist_momentum_grid0, hist_momentum_grid1, hist_mass_action, hist_momentum_action0, hist_momentum_action1 in memory:
                     returnMemory.append((
                         self.system.get_encoded_state(hist_mass_grid),
-                        hist_action
+                        hist_mass_action,
+                        hist_momentum_action0,
+                        hist_momentum_action1
                     ))
                 return returnMemory
                 
@@ -187,15 +194,17 @@ class GravityAI:
         random.shuffle(memory)
         for batchIdx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batchIdx:min(len(memory) - 1, batchIdx + self.args['batch_size'])] # Change to memory[batchIdx:batchIdx+self.args['batch_size']] in case of an error
-            mass_grid, policy_targets = zip(*sample)
+            state, mass_policy_targets, momentum_policy_targets0, momentum_policy_targets1 = zip(*sample)
             
-            mass_grid, policy_targets = np.array(mass_grid), np.array(policy_targets)
+            state, mass_policy_targets, momentum_policy_targets0, momentum_policy_targets1 = np.array(state), np.array(mass_policy_targets), np.array(momentum_policy_targets0), np.array(momentum_policy_targets1)
             
-            mass_grid = torch.tensor(mass_grid, dtype=torch.float32, device=self.model.device)
-            policy_targets = torch.tensor(policy_targets, dtype=torch.float32, device=self.model.device)
+            state = torch.tensor(state, dtype=torch.float32, device=self.model.device)
+            mass_policy_targets = torch.tensor(mass_policy_targets, dtype=torch.float32, device=self.model.device)
+            momentum_policy_targets0 = torch.tensor(momentum_policy_targets0, dtype=torch.float32, device=self.model.device)
+            momentum_policy_targets1 = torch.tensor(momentum_policy_targets1, dtype=torch.float32, device=self.model.device)
             
-            out_policy = self.model(mass_grid)
-            squared_difference = (policy_targets-out_policy) ** 2
+            out_policy = self.model(state)
+            squared_difference = (mass_policy_targets-out_policy) ** 2
 
             loss = squared_difference.sum()
             
