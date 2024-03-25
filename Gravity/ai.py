@@ -27,7 +27,6 @@ class Space:
         self.row_count = 20
         self.column_count = 20
         self.action_size = self.row_count*self.column_count
-        self.max_time_steps = 100
         self.grid_width = 4e11
         self.meters_per_pixel = self.grid_width/self.column_count
         self.max_mass = 1e40
@@ -78,9 +77,6 @@ class Space:
         encoded_state = np.array([mass_grid, momentum_grid0, momentum_grid1]).astype(np.float32)
         
         return encoded_state
-    
-    def is_terminal(self, time_step):
-        return (time_step >= self.max_time_steps)
     
     def simulate_next_state(self, mass, velocity, position, radius):
         for i in range(2500):
@@ -195,9 +191,7 @@ class GravityAI:
 
             time_step_count += 1
             
-            is_terminal = self.system.is_terminal(time_step_count)
-            
-            if is_terminal:
+            if time_step_count >= self.args['max_time_steps']:
                 returnMemory = []
                 for hist_mass_grid, hist_momentum_grid0, hist_momentum_grid1, hist_mass_action, hist_momentum_action0, hist_momentum_action1 in memory:
                     returnMemory.append((
