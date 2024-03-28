@@ -26,6 +26,8 @@ momentum_grid = space.get_momentum_grid(mass, position, velocity)
 
 mass_grid = space.get_mass_grid(mass, position)
 momentum_grid = space.get_momentum_grid(mass, position, velocity)
+gravitational_field_grid = space.get_gravitational_field_grid(mass, position)
+gravitational_field_derivative_grid = space.get_gravitational_field_derivative_grid(mass, position, velocity)
 
 args = {
     'search': True,
@@ -47,12 +49,19 @@ while(waiting):
             break
         break
 
-def draw_mass_grid(space, mass_grid, width, height):
+def draw_grid(space, grid, width, height):
     for y in range(space.row_count):
         for x in range(space.column_count):
-            if(mass_grid[y,x] > 0):
-                color = 255-mass_grid[y,x]*255
-                pygame.draw.rect(screen, (color,color,color), (x/space.column_count*width, y/space.row_count*height, width/space.column_count, height/space.row_count))
+            if(grid[y,x] > 0):
+                color = 255-(grid[y,x]-np.min(grid))/(np.max(grid)-np.min(grid))*255
+                pygame.draw.rect(screen, (color,color,color), (x/space.column_count*width, y/space.row_count*height, np.ceil(width/space.column_count), np.ceil(height/space.row_count)))
+
+def draw_grid2(space, grid, width, height):
+    max_amplitude = np.max(abs(grid-0.5))
+    for y in range(space.row_count):
+        for x in range(space.column_count):
+            color = ((grid[y,x]-0.5)/max_amplitude+1)*255/2
+            pygame.draw.rect(screen, (color,color,color), (x/space.column_count*width, y/space.row_count*height, np.ceil(width/space.column_count), np.ceil(height/space.row_count)))
 
 running = True
 while running:
@@ -62,10 +71,12 @@ while running:
             running = False
             break
     screen.fill((255, 255, 255))
-    draw_mass_grid(space, mass_grid, width, height)
-    #space.simulate_next_state(mass, velocity, position, radius)
-    #mass_grid = space.get_mass_grid(mass, position)
-    mass_grid, momentum_grid = ai.play(args, space, model_dict, mass_grid, momentum_grid)
+    draw_grid2(space, gravitational_field_derivative_grid, width, height)
+    space.simulate_next_state(mass, velocity, position, radius)
+    mass_grid = space.get_mass_grid(mass, position)
+    gravitational_field_grid = space.get_gravitational_field_grid(mass, position)
+    gravitational_field_derivative_grid = space.get_gravitational_field_derivative_grid(mass, position, velocity)
+    #mass_grid, momentum_grid = ai.play(args, space, model_dict, mass_grid, momentum_grid)
 
     pygame.display.flip()
 

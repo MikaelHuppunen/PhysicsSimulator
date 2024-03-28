@@ -26,6 +26,9 @@ def time_left(args, simulation_timer, iteration, simulation_iteration, training_
     training_time_left = training_timer*(args['num_iterations']*args['num_epochs']-iteration*args['num_epochs']-epoch-1+0.01)/(iteration*args['num_epochs']+epoch+1+0.01)
     return round(simulation_time_left+training_time_left, 2)
 
+def distance(position1, position2):
+    return max(np.sqrt((position1[0]-position2[0])**2+(position1[1]-position2[1])**2),1)
+
 class Space:
     def __init__(self):
         self.gravitational_constant = 6.67384e-11
@@ -66,6 +69,32 @@ class Space:
                 mass_grid[y,x] += np.log(mass[i])/np.log(self.max_mass)
         
         return mass_grid
+    
+    def get_gravitational_field_grid(self, mass, position):
+        gravitational_field_grid = np.zeros((self.row_count, self.column_count))
+        for i in range(len(mass)):
+            x, y = int(position[i][0]/self.meters_per_pixel),int(position[i][1]/self.meters_per_pixel)
+            for grid_y in range(self.column_count):
+                for grid_x in range(self.row_count):
+                    gravitational_field_grid[grid_y,grid_x] += mass[i]/((self.meters_per_pixel*distance((x,y),(grid_x, grid_y)))**2)      
+
+        for grid_y in range(self.column_count):
+            for grid_x in range(self.row_count):
+                gravitational_field_grid[grid_y,grid_x] = np.log(gravitational_field_grid[grid_y,grid_x])/np.log(self.max_mass/self.meters_per_pixel)
+        return gravitational_field_grid
+    
+    def get_gravitational_field_derivative_grid(self, mass, position, velocity):
+        gravitational_field_grid = np.zeros((self.row_count, self.column_count))
+        for i in range(len(mass)):
+            x, y = int(position[i][0]/self.meters_per_pixel),int(position[i][1]/self.meters_per_pixel)
+            for grid_y in range(self.column_count):
+                for grid_x in range(self.row_count):
+                    gravitational_field_grid[grid_y,grid_x] += -2*np.sign(x-grid_x)*max(abs(x-grid_x),1)*velocity[i][0]+np.sign(y-grid_y)*max(abs(y-grid_y),1)*velocity[i][1]*mass[i]/((self.meters_per_pixel*distance((x,y),(grid_x, grid_y))**2)**2)      
+
+        for grid_y in range(self.column_count):
+            for grid_x in range(self.row_count):
+                gravitational_field_grid[grid_y,grid_x] = (np.sign(gravitational_field_grid[grid_y,grid_x])*np.log(abs(gravitational_field_grid[grid_y,grid_x])+1)/np.log(2*self.speed_of_light*self.max_mass/self.meters_per_pixel)+1)/2
+        return gravitational_field_grid
     
     def get_momentum_grid(self, mass, position, velocity):
         momentum_grid = []
