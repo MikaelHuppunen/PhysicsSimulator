@@ -21,6 +21,11 @@ def print_policy_heatmap(policy):
         slice_rounded = np.around(policy[i:i+8], decimals=2)
         print(" ".join(["{:7.2f}".format(item) for item in slice_rounded]))
 
+def time_left(args, simulation_timer, iteration, simulation_iteration, training_timer, epoch):
+    simulation_time_left = simulation_timer*(args['num_iterations']*args['num_simulation_iterations']-iteration*args['num_simulation_iterations']-simulation_iteration-1+0.01)/(iteration*args['num_simulation_iterations']+simulation_iteration+1+0.01)
+    training_time_left = training_timer*(args['num_iterations']*args['num_epochs']-iteration*args['num_epochs']-epoch-1+0.01)/(iteration*args['num_epochs']+epoch+1+0.01)
+    return round(simulation_time_left+training_time_left, 2)
+
 class Space:
     def __init__(self):
         self.gravitational_constant = 6.67384e-11
@@ -230,18 +235,24 @@ class GravityAI:
     
     def learn(self):
         start = time.time()
+        simulation_timer = 0.0
+        training_timer = 0.0
         for iteration in range(self.args['num_iterations']):
             memory = []
             
             self.model.eval()
-            for selfPlay_iteration in range(self.args['num_simulation_iterations']):
+            for simulation_iteration in range(self.args['num_simulation_iterations']):
+                simulation_start = time.time()
                 memory += self.simulation()
-                print(f"{iteration+1}/{self.args['num_iterations']}: {100*(selfPlay_iteration+1)/self.args['num_simulation_iterations']}%, estimated time left: {round((time.time()-start)*(self.args['num_iterations']*self.args['num_simulation_iterations']-iteration*self.args['num_simulation_iterations']-selfPlay_iteration-1+0.01)/(iteration*self.args['num_simulation_iterations']+selfPlay_iteration+1+0.01),2)}s")
+                simulation_timer += time.time()-simulation_start
+                print(f"{iteration+1}/{self.args['num_iterations']}: {100*(simulation_iteration+1)/self.args['num_simulation_iterations']}%, estimated time left: {time_left(self.args, simulation_timer, iteration, simulation_iteration, training_timer, 0)}s")
                 
             self.model.train()
             for epoch in range(self.args['num_epochs']):
+                training_start = time.time()
                 self.train(memory)
-                print(f"{100*(epoch+1)/self.args['num_epochs']}%")
+                training_timer += time.time()-training_start
+                print(f"{100*(epoch+1)/self.args['num_epochs']}%, estimated time left: {time_left(self.args, simulation_timer, iteration, 0, training_timer, epoch)}s")
             
             torch.save(self.model.state_dict(), f"./Gravity/models/model_{iteration}_{self.system}.pt")
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
