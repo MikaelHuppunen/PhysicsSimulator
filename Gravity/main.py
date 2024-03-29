@@ -72,11 +72,12 @@ while running:
             break
     screen.fill((255, 255, 255))
     draw_grid2(space, gravitational_field_derivative_grid, width, height)
-    space.simulate_next_state(mass, velocity, position, radius)
-    mass_grid = space.get_mass_grid(mass, position)
+    #draw_grid(space, gravitational_field_grid, width, height)
+    #space.simulate_next_state(mass, velocity, position, radius)
+    #mass_grid = space.get_mass_grid(mass, position)
     gravitational_field_grid = space.get_gravitational_field_grid(mass, position)
     gravitational_field_derivative_grid = space.get_gravitational_field_derivative_grid(mass, position, velocity)
-    #mass_grid, momentum_grid = ai.play(args, space, model_dict, mass_grid, momentum_grid)
+    gravitational_field_grid, gravitational_field_derivative_grid = ai.play(args, space, model_dict, gravitational_field_grid, gravitational_field_derivative_grid)
 
     pygame.display.flip()
 
