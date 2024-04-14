@@ -71,8 +71,8 @@ while running:
             running = False
             break
     screen.fill((255, 255, 255))
-    draw_grid2(space, gravitational_field_derivative_grid, width, height)
-    #draw_grid(space, gravitational_field_grid, width, height)
+    #draw_grid2(space, gravitational_field_derivative_grid, width, height)
+    draw_grid(space, gravitational_field_grid, width, height)
     #space.simulate_next_state(mass, velocity, position, radius)
     #mass_grid = space.get_mass_grid(mass, position)
     #gravitational_field_grid = space.get_gravitational_field_grid(mass, position)

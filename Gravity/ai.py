@@ -55,6 +55,7 @@ class Space:
     
     def get_initial_velocity(self):
         velocity = [[0,0,0],[0,2.929e4,0]]
+        velocity[1][1] += (random.random()-0.5)*2.929e4/10
         return velocity
     
     def get_initial_radius(self):   
@@ -269,7 +270,7 @@ class GravityAI:
                 training_start = time.time()
                 self.train(memory)
                 training_timer += time.time()-training_start
-                print(f"{100*(epoch+1)/self.args['num_epochs']}%, estimated time left: {time_left(self.args, simulation_timer, iteration, 0, training_timer, epoch)}s")
+                print(f"{100*(epoch+1)/self.args['num_epochs']}%, estimated time left: {time_left(self.args, simulation_timer, iteration, self.args['num_simulation_iterations']-1, training_timer, epoch)}s")
             
             torch.save(self.model.state_dict(), f"./Gravity/models/model_{iteration}_{self.system}.pt")
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
