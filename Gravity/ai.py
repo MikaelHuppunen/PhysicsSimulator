@@ -276,7 +276,7 @@ class GravityAI:
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 4, 256, device=device, number_of_input_channels=2)
+    model = ResNet(system, 4, 128, device=device, number_of_input_channels=2)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -286,7 +286,7 @@ def learn(args, system):
 
 @torch.no_grad()
 def play(args, system, model_dict, gravitational_field_grid, gravitational_field_derivative_grid):
-    model = ResNet(system, 4, 256, device=device, number_of_input_channels=2)
+    model = ResNet(system, 4, 128, device=device, number_of_input_channels=2)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))

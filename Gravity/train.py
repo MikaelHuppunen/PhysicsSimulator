@@ -1,11 +1,11 @@
 from ai import *
 
 args = {
-    'num_iterations': 2,
-    'num_simulation_iterations': 16,
-    'max_time_steps': 6,
+    'num_iterations': 1,
+    'num_simulation_iterations': 128,
+    'max_time_steps': 600,
     'num_parallel_systems': 100,
-    'num_epochs': 16,
+    'num_epochs': 32,
     'batch_size': 128
 }
 
