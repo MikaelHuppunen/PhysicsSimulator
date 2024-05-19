@@ -24,7 +24,11 @@ def print_policy_heatmap(policy):
 def time_left(args, simulation_timer, iteration, simulation_iteration, training_timer, epoch):
     simulation_time_left = simulation_timer*(args['num_iterations']*args['num_simulation_iterations']-iteration*args['num_simulation_iterations']-simulation_iteration-1+0.01)/(iteration*args['num_simulation_iterations']+simulation_iteration+1+0.01)
     training_time_left = training_timer*(args['num_iterations']*args['num_epochs']-iteration*args['num_epochs']-epoch-1+0.01)/(iteration*args['num_epochs']+epoch+1+0.01)
-    return round(simulation_time_left+training_time_left, 2)
+    seconds = simulation_time_left+training_time_left
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    return '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
 
 def distance(position1, position2):
     return max(np.sqrt((position1[0]-position2[0])**2+(position1[1]-position2[1])**2),1)
@@ -46,20 +50,19 @@ class Space:
         return "Space"
     
     def get_initial_mass(self):
-        mass = [1.9891e30,5.9e24]
+        mass = [1.9891e30]
         return mass
     
     def get_initial_position(self):
-        position = [[2e11,2e11,0],[3.5210e11,2e11,0]]
+        position = [[2e11,2e11,0]]
         return position
     
     def get_initial_velocity(self):
-        velocity = [[0,0,0],[0,2.929e4,0]]
-        velocity[1][1] += (random.random()-0.5)*2.929e4/10
+        velocity = [[0,0,0]]
         return velocity
     
     def get_initial_radius(self):   
-        radius = [6.957e8,6.372e6]
+        radius = [6.957e8]
         return radius
     
     def get_mass_grid(self, mass, position):

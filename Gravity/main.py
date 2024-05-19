@@ -60,7 +60,10 @@ def draw_grid2(space, grid, width, height):
     max_amplitude = np.max(abs(grid-0.5))
     for y in range(space.row_count):
         for x in range(space.column_count):
-            color = ((grid[y,x]-0.5)/max_amplitude+1)*255/2
+            if max_amplitude != 0:
+                color = ((grid[y,x]-0.5)/max_amplitude+1)*255/2
+            else:
+                color = 255/2
             pygame.draw.rect(screen, (color,color,color), (x/space.column_count*width, y/space.row_count*height, np.ceil(width/space.column_count), np.ceil(height/space.row_count)))
 
 running = True
@@ -71,13 +74,13 @@ while running:
             running = False
             break
     screen.fill((255, 255, 255))
-    draw_grid2(space, gravitational_field_derivative_grid, width, height)
-    #draw_grid(space, gravitational_field_grid, width, height)
-    #space.simulate_next_state(mass, velocity, position, radius)
-    #mass_grid = space.get_mass_grid(mass, position)
-    #gravitational_field_grid = space.get_gravitational_field_grid(mass, position)
-    #gravitational_field_derivative_grid = space.get_gravitational_field_derivative_grid(mass, position, velocity)
-    gravitational_field_grid, gravitational_field_derivative_grid = ai.play(args, space, model_dict, gravitational_field_grid, gravitational_field_derivative_grid)
+    #draw_grid2(space, gravitational_field_derivative_grid, width, height)
+    draw_grid(space, gravitational_field_grid, width, height)
+    space.simulate_next_state(mass, velocity, position, radius)
+    mass_grid = space.get_mass_grid(mass, position)
+    gravitational_field_grid = space.get_gravitational_field_grid(mass, position)
+    gravitational_field_derivative_grid = space.get_gravitational_field_derivative_grid(mass, position, velocity)
+    #gravitational_field_grid, gravitational_field_derivative_grid = ai.play(args, space, model_dict, gravitational_field_grid, gravitational_field_derivative_grid)
 
     pygame.display.flip()
 
