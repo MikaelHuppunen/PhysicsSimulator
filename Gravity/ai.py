@@ -15,6 +15,7 @@ import random
 import math
 import time
 from gravity import approximate
+from copy import copy, deepcopy
 
 def print_policy_heatmap(policy):
     for i in range(0, 64, 8):
@@ -38,10 +39,11 @@ class Space:
         self.gravitational_constant = 6.67384e-11
         self.row_count = 20
         self.column_count = 20
-        self.action_size = self.row_count*self.column_count
+        self.action_size = 12
         self.grid_width = 4e11
         self.meters_per_pixel = self.grid_width/self.column_count
         self.max_mass = 1e40
+        self.max_distance = 1e20
         self.speed_of_light = 299792458.0
         self.dimensions = 2
         self.time_step = 600
@@ -50,92 +52,70 @@ class Space:
         return "Space"
     
     def get_initial_mass(self):
-        mass = [1.9891e30]
+        mass = [1.9891e30, 5.9e24]
         return mass
     
     def get_initial_position(self):
-        position = [[2e11,2e11,0]]
+        position = [[0,0,0],[1.5210e11,0,0]]
         return position
     
     def get_initial_velocity(self):
-        velocity = [[0,0,0]]
+        velocity = [[0,0,0],[0,2.929e4,0]]
         return velocity
     
     def get_initial_radius(self):   
-        radius = [6.957e8]
+        radius = [6.957e8,6.372e6]
         return radius
     
-    def get_mass_grid(self, mass, position):
-        mass_grid = np.zeros((self.row_count, self.column_count))
+    def normalize_mass(self, mass):
+        normalized_mass = np.zeros(len(mass))
         for i in range(len(mass)):
-            x, y = int(position[i][0]/self.meters_per_pixel),int(position[i][1]/self.meters_per_pixel)
-            if x < self.column_count and y < self.row_count:
-                mass_grid[y,x] += np.log(mass[i])/np.log(self.max_mass)
-        
-        return mass_grid
+            normalized_mass[i] = np.log(mass[i]+1)/np.log(self.max_mass)
+        return normalized_mass
     
-    def get_gravitational_field_grid(self, mass, position):
-        gravitational_field_grid = np.zeros((self.row_count, self.column_count))
-        for i in range(len(mass)):
-            x, y = int(position[i][0]/self.meters_per_pixel),int(position[i][1]/self.meters_per_pixel)
-            for grid_y in range(self.column_count):
-                for grid_x in range(self.row_count):
-                    gravitational_field_grid[grid_y,grid_x] += mass[i]/((self.meters_per_pixel*distance((x,y),(grid_x, grid_y)))**2)      
+    def normalize_position(self, position):
+        normalized_position = np.zeros(len(position)*len(position[0]))
+        for i in range(len(position)):
+            for j in range(len(position[0])):
+                normalized_position[len(position[0])*i+j] = np.sign(position[i][j])*np.log(abs(position[i][j])+1)/np.log(self.max_distance)
+        return normalized_position
+    
+    def normalize_velocity(self, velocity):
+        normalized_velocity = np.zeros(len(velocity)*len(velocity[0]))
+        for i in range(len(velocity)):
+            for j in range(len(velocity[0])):
+                normalized_velocity[len(velocity[0])*i+j] = np.sign(velocity[i][j])*np.log(abs(velocity[i][j])+1)/np.log(self.speed_of_light)
+        return normalized_velocity
+    
+    def get_encoded_state(self, mass, velocity, position):
+        normalized_mass = self.normalize_mass(mass)
+        normalized_position = self.normalize_position(position)
+        normalized_velocity = self.normalize_velocity(velocity)
 
-        for grid_y in range(self.column_count):
-            for grid_x in range(self.row_count):
-                gravitational_field_grid[grid_y,grid_x] = np.log(gravitational_field_grid[grid_y,grid_x])/np.log(self.max_mass/self.meters_per_pixel)
-        return gravitational_field_grid
-    
-    def get_gravitational_field_derivative_grid(self, mass, position, velocity):
-        gravitational_field_grid = np.zeros((self.row_count, self.column_count))
-        for i in range(len(mass)):
-            x, y = int(position[i][0]/self.meters_per_pixel),int(position[i][1]/self.meters_per_pixel)
-            for grid_y in range(self.column_count):
-                for grid_x in range(self.row_count):
-                    gravitational_field_grid[grid_y,grid_x] += -2*np.sign(x-grid_x)*max(abs(x-grid_x),1)*velocity[i][0]+np.sign(y-grid_y)*max(abs(y-grid_y),1)*velocity[i][1]*mass[i]/((self.meters_per_pixel*distance((x,y),(grid_x, grid_y))**2)**2)      
-
-        for grid_y in range(self.column_count):
-            for grid_x in range(self.row_count):
-                gravitational_field_grid[grid_y,grid_x] = (np.sign(gravitational_field_grid[grid_y,grid_x])*np.log(abs(gravitational_field_grid[grid_y,grid_x])+1)/np.log(2*self.speed_of_light*self.max_mass/self.meters_per_pixel)+1)/2
-        return gravitational_field_grid
-    
-    def get_momentum_grid(self, mass, position, velocity):
-        momentum_grid = []
-        for i in range(self.dimensions):
-            momentum_grid += [np.ones((self.row_count, self.column_count))/2]
-            for j in range(len(mass)):
-                x, y = int(position[j][0]/self.meters_per_pixel),int(position[j][1]/self.meters_per_pixel)
-                if x < self.column_count and y < self.row_count:
-                    momentum_grid[i][y,x] += (np.sign(velocity[j][i])*np.log10(mass[j]*abs(velocity[j][i])+1)/np.log10(self.max_mass*self.speed_of_light))/2
-        
-        return np.array(momentum_grid)
-    
-    def get_encoded_state(self, gravitational_field_grid, gravitational_field_derivative_grid):
-        encoded_state = np.array([gravitational_field_grid, gravitational_field_derivative_grid]).astype(np.float32)
-        
+        encoded_state = np.concatenate((normalized_mass, normalized_position, normalized_velocity)).astype(np.float32)
         return encoded_state
     
     def simulate_next_state(self, mass, velocity, position, radius):
         for i in range(2500):
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
 
-    def simulate_action(self, mass, velocity, position, radius, gravitational_field_grid, gravitational_field_derivative_grid):
+    def simulate_action(self, mass, velocity, position, radius):
+        old_velocity = deepcopy(velocity)
+        old_position = deepcopy(position)
         self.simulate_next_state(mass, velocity, position, radius)
-        new_gravitational_field_grid = self.get_gravitational_field_grid(mass, position)
-        new_gravitational_field_derivative_grid = self.get_gravitational_field_derivative_grid(mass, position, velocity)
-        gravitational_field_action = new_gravitational_field_grid-gravitational_field_grid
-        gravitational_field_derivative_action = new_gravitational_field_derivative_grid-gravitational_field_derivative_grid
-        return gravitational_field_action, gravitational_field_derivative_action
-
+        position_action = (self.normalize_position(position)-self.normalize_position(old_position))
+        velocity_action = (self.normalize_velocity(velocity)-self.normalize_velocity(old_velocity))
+        action = np.concatenate((position_action,velocity_action))
+        return action
+    
 class ResNet(nn.Module):
-    def __init__(self, system, num_resBlocks, num_hidden, device, number_of_input_channels):
+    def __init__(self, system, num_resBlocks, num_hidden, device, number_of_inputs):
         super().__init__() #initiates the parent class
         
         self.device = device
         self.startBlock = nn.Sequential(
-            nn.Conv2d(number_of_input_channels, num_hidden, kernel_size=3, padding=1), #convolutional layer(input channels, output channels, size of layer, match the input size with output size)
-            nn.BatchNorm2d(num_hidden), #normalize output
+            nn.Linear(number_of_inputs, num_hidden),
+            nn.BatchNorm1d(num_hidden), #normalize output
             nn.ReLU()
         )
         
@@ -144,20 +124,11 @@ class ResNet(nn.Module):
             [ResBlock(num_hidden) for i in range(num_resBlocks)]
         )
         
-        self.policyHead_gravitational_field = nn.Sequential(
-            nn.Conv2d(num_hidden, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
+        self.policyHead = nn.Sequential(
+            nn.Linear(num_hidden, 32),
+            nn.BatchNorm1d(32),
             nn.ReLU(),
-            nn.Flatten(), #takes each element from a tensor to an array
-            nn.Linear(32 * system.row_count * system.column_count, system.action_size) #linear transformation(input size, output size)
-        )
-
-        self.policyHead_gravitational_field_derivative = nn.Sequential(
-            nn.Conv2d(num_hidden, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.Flatten(), #takes each element from a tensor to an array
-            nn.Linear(32 * system.row_count * system.column_count, system.action_size) #linear transformation(input size, output size)
+            nn.Linear(32, system.action_size) #linear transformation(input size, output size)
         )
         
         self.to(device) #move to the device where you want to run the operations
@@ -167,25 +138,17 @@ class ResNet(nn.Module):
         x = self.startBlock(x)
         for resBlock in self.backBone:
             x = resBlock(x)
-        gravitational_field_policy = self.policyHead_gravitational_field(x)
-        gravitational_field_derivative_policy = self.policyHead_gravitational_field_derivative(x)
-        return gravitational_field_policy, gravitational_field_derivative_policy
-        
-        
+        policy = self.policyHead(x)
+        return policy
+
 class ResBlock(nn.Module):
     def __init__(self, num_hidden):
         super().__init__()
-        self.conv1 = nn.Conv2d(num_hidden, num_hidden, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(num_hidden)
-        self.conv2 = nn.Conv2d(num_hidden, num_hidden, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(num_hidden)
+        self.fc = nn.Linear(num_hidden, num_hidden)
+        self.bn = nn.BatchNorm1d(num_hidden)
         
     def forward(self, x):
-        residual = x
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = self.bn2(self.conv2(x))
-        x += residual
-        x = F.relu(x)
+        x = F.relu(self.bn(self.fc(x)))
         return x
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -204,29 +167,21 @@ class GravityAI:
         position = self.system.get_initial_position()
         velocity = self.system.get_initial_velocity()
         radius = self.system.get_initial_radius()
-        gravitational_field_grid = self.system.get_gravitational_field_grid(mass, position)
-        gravitational_field_derivative_grid = self.system.get_gravitational_field_derivative_grid(mass, position, velocity)
         time_step_count = 0
         
         while True:
-            gravitational_field_action, gravitational_field_derivative_action = self.system.simulate_action(mass, velocity, position, radius, gravitational_field_grid, gravitational_field_derivative_grid)
+            action = self.system.simulate_action(mass, velocity, position, radius)
             
-            memory.append((gravitational_field_grid, gravitational_field_derivative_grid, gravitational_field_action.flatten(), gravitational_field_derivative_action.flatten()))
-
-            gravitational_field_grid = gravitational_field_grid + gravitational_field_action
-            gravitational_field_derivative_grid = gravitational_field_derivative_grid + gravitational_field_derivative_action
-            gravitational_field_grid = np.clip(gravitational_field_grid, 0, 1)
-            gravitational_field_derivative_grid = np.clip(gravitational_field_derivative_grid, 0, 1)
+            memory.append((mass, velocity, position, action))
 
             time_step_count += 1
             
             if time_step_count >= self.args['max_time_steps']:
                 returnMemory = []
-                for hist_gravitational_field_grid, hist_gravitational_field_derivative_grid, hist_gravitational_field_action, hist_gravitational_field_derivative_action in memory:
+                for hist_mass, hist_velocity, hist_position, hist_action in memory:
                     returnMemory.append((
-                        self.system.get_encoded_state(hist_gravitational_field_grid, hist_gravitational_field_derivative_grid),
-                        hist_gravitational_field_action
-                        , hist_gravitational_field_derivative_action
+                        self.system.get_encoded_state(hist_mass, hist_velocity, hist_position),
+                        hist_action
                     ))
                 return returnMemory
                 
@@ -234,19 +189,16 @@ class GravityAI:
         random.shuffle(memory)
         for batchIdx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batchIdx:min(len(memory) - 1, batchIdx + self.args['batch_size'])] # Change to memory[batchIdx:batchIdx+self.args['batch_size']] in case of an error
-            state, gravitational_field_policy_targets, gravitational_field_derivative_policy_targets = zip(*sample)
+            state, policy_targets = zip(*sample)
             
-            state, gravitational_field_policy_targets, gravitational_field_derivative_policy_targets = np.array(state), np.array(gravitational_field_policy_targets), np.array(gravitational_field_derivative_policy_targets)
+            state, policy_targets = np.array(state), np.array(policy_targets)
             
             state = torch.tensor(state, dtype=torch.float32, device=self.model.device)
-            gravitational_field_policy_targets = torch.tensor(gravitational_field_policy_targets, dtype=torch.float32, device=self.model.device)
-            gravitational_field_derivative_policy_targets = torch.tensor(gravitational_field_derivative_policy_targets, dtype=torch.float32, device=self.model.device)
-            
-            out_gravitational_field_policy, out_gravitational_field_derivative_policy = self.model(state)
-            gravitational_field_squared_difference = (gravitational_field_policy_targets-out_gravitational_field_policy) ** 2
-            gravitational_field_derivative_squared_difference = (gravitational_field_derivative_policy_targets-out_gravitational_field_derivative_policy) ** 2
+            policy_targets = torch.tensor(policy_targets, dtype=torch.float32, device=self.model.device)
 
-            loss = gravitational_field_squared_difference.sum() + gravitational_field_derivative_squared_difference.sum()
+            out_policy = self.model(state)
+            squared_difference = (policy_targets-out_policy) ** 2
+            loss = squared_difference.sum()
             
             self.optimizer.zero_grad()
             loss.backward()
@@ -279,7 +231,7 @@ class GravityAI:
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 4, 128, device=device, number_of_input_channels=2)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=14)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -289,7 +241,7 @@ def learn(args, system):
 
 @torch.no_grad()
 def play(args, system, model_dict, gravitational_field_grid, gravitational_field_derivative_grid):
-    model = ResNet(system, 4, 128, device=device, number_of_input_channels=2)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=14)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
