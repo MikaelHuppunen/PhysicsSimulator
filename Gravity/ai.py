@@ -86,7 +86,7 @@ class Space:
             for j in range(len(velocity[0])):
                 normalized_velocity[len(velocity[0])*i+j] = np.sign(velocity[i][j])*np.log(abs(velocity[i][j])+1)/np.log(self.speed_of_light)
         return normalized_velocity
-    
+
     def get_encoded_state(self, mass, velocity, position):
         normalized_mass = self.normalize_mass(mass)
         normalized_position = self.normalize_position(position)
@@ -96,7 +96,7 @@ class Space:
         return encoded_state
     
     def simulate_next_state(self, mass, velocity, position, radius):
-        for i in range(2500):
+        for i in range(600):
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
 
     def simulate_action(self, mass, velocity, position, radius):
@@ -107,6 +107,13 @@ class Space:
         velocity_action = (self.normalize_velocity(velocity)-self.normalize_velocity(old_velocity))
         action = np.concatenate((position_action,velocity_action))
         return action
+    
+    def get_next_state(self, velocity, position, action):
+        position_action = action[0:6]
+        velocity_action = action[6:12]
+        position_action = position_action.reshape((2,3))
+        velocity_action = velocity_action.reshape((2,3))
+        return position+position_action, velocity+velocity_action
     
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_inputs):
@@ -195,6 +202,7 @@ class GravityAI:
             
             state = torch.tensor(state, dtype=torch.float32, device=self.model.device)
             policy_targets = torch.tensor(policy_targets, dtype=torch.float32, device=self.model.device)
+            print(policy_targets)
 
             out_policy = self.model(state)
             squared_difference = (policy_targets-out_policy) ** 2
@@ -240,24 +248,19 @@ def learn(args, system):
     print(f"learning time: {time.time()-start_time}s")
 
 @torch.no_grad()
-def play(args, system, model_dict, gravitational_field_grid, gravitational_field_derivative_grid):
+def play(args, system, model_dict, mass, velocity, position):
     model = ResNet(system, 8, 64, device=device, number_of_inputs=14)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
     model.eval() #playing mode
 
-    gravitational_field_action_probs, gravitational_field_derivative_action_probs = model(
-        torch.tensor(system.get_encoded_state(gravitational_field_grid, gravitational_field_derivative_grid), device=model.device).unsqueeze(0)
+    action_probs = model(
+        torch.tensor(system.get_encoded_state(mass, velocity, position), device=model.device).unsqueeze(0)
     )
-    gravitational_field_action_probs = gravitational_field_action_probs.squeeze(0).cpu().numpy()
-    gravitational_field_derivative_action_probs = gravitational_field_derivative_action_probs.squeeze(0).cpu().numpy()
-    gravitational_field_action = gravitational_field_action_probs.reshape(gravitational_field_grid.shape)
-    gravitational_field_derivative_action = gravitational_field_action_probs.reshape(gravitational_field_derivative_grid.shape)
+    action = action_probs.squeeze(0).cpu().numpy()
+    #action = action_probs.reshape(state.shape)
     
-    gravitational_field_grid = gravitational_field_grid + gravitational_field_action
-    gravitational_field_derivative_grid = gravitational_field_derivative_grid + gravitational_field_derivative_action
-    gravitational_field_grid = np.clip(gravitational_field_grid, 0, 1)
-    gravitational_field_derivative_grid = np.clip(gravitational_field_derivative_grid, 0, 1)
+    velocity, position = system.get_next_state(velocity, position, action)
 
-    return gravitational_field_grid, gravitational_field_derivative_grid
+    return velocity, position
