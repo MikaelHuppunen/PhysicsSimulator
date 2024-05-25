@@ -39,7 +39,7 @@ class Space:
         self.gravitational_constant = 6.67384e-11
         self.row_count = 20
         self.column_count = 20
-        self.action_size = 12
+        self.action_size = 2
         self.grid_width = 4e11
         self.meters_per_pixel = self.grid_width/self.column_count
         self.max_mass = 1e40
@@ -55,17 +55,28 @@ class Space:
         mass = [1.9891e30, 5.9e24]
         return mass
     
-    def get_initial_position(self):
-        position = [[0,0,0],[1.5210e11,0,0]]
+    def get_initial_position(self, angle):
+        position = [[1000,0,0]]
+        position += [[np.cos(angle)*1.5210e11,np.sin(angle)*1.5210e11,0]]
         return position
     
-    def get_initial_velocity(self):
-        velocity = [[0,0,0],[0,2.929e4,0]]
+    def get_initial_velocity(self, angle):
+        velocity = [[0,0,0]]
+        velocity += [[np.cos(angle)*2.929e4,np.sin(angle)*2.929e4,0]]
         return velocity
     
     def get_initial_radius(self):   
         radius = [6.957e8,6.372e6]
         return radius
+    
+    def get_initial_state(self):
+        random_angle = random.uniform(-math.pi, math.pi)
+        mass = self.get_initial_mass()
+        position = self.get_initial_position(random_angle)
+        velocity = self.get_initial_velocity(random_angle+np.pi/2)
+        radius = self.get_initial_radius()
+
+        return mass, position, velocity, radius
     
     def normalize_mass(self, mass):
         normalized_mass = np.zeros(len(mass))
@@ -87,12 +98,12 @@ class Space:
                 normalized_velocity[len(velocity[0])*i+j] = np.sign(velocity[i][j])*np.log(abs(velocity[i][j])+1)/np.log(self.speed_of_light)
         return normalized_velocity
 
-    def get_encoded_state(self, mass, velocity, position):
-        normalized_mass = self.normalize_mass(mass)
-        normalized_position = self.normalize_position(position)
-        normalized_velocity = self.normalize_velocity(velocity)
+    def get_encoded_state(self, position):
+        #normalized_mass = self.normalize_mass(mass)
+        #normalized_position = self.normalize_position(position)
+        #normalized_velocity = self.normalize_velocity(velocity)
 
-        encoded_state = np.concatenate((normalized_mass, normalized_position, normalized_velocity)).astype(np.float32)
+        encoded_state = np.array(self.get_angles(position)).astype(np.float32)
         return encoded_state
     
     def simulate_next_state(self, mass, velocity, position, radius):
@@ -100,20 +111,37 @@ class Space:
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
 
     def simulate_action(self, mass, velocity, position, radius):
-        old_velocity = deepcopy(velocity)
-        old_position = deepcopy(position)
+        #old_velocity = deepcopy(velocity)
+        #old_position = deepcopy(position)
+        old_angles = self.get_angles(position)
         self.simulate_next_state(mass, velocity, position, radius)
-        position_action = (self.normalize_position(position)-self.normalize_position(old_position))
-        velocity_action = (self.normalize_velocity(velocity)-self.normalize_velocity(old_velocity))
-        action = np.concatenate((position_action,velocity_action))
+        angles = self.get_angles(position)
+        action = np.array(angles)-np.array(old_angles)
+        action = (action + np.pi) % (2 * np.pi) - np.pi
+        #position_action = (self.normalize_position(position)-self.normalize_position(old_position))
+        #velocity_action = (self.normalize_velocity(velocity)-self.normalize_velocity(old_velocity))
+        #action = np.concatenate((position_action,velocity_action))
         return action
     
     def get_next_state(self, velocity, position, action):
-        position_action = action[0:6]
-        velocity_action = action[6:12]
-        position_action = position_action.reshape((2,3))
-        velocity_action = velocity_action.reshape((2,3))
-        return position+position_action, velocity+velocity_action
+        #position_action = action[0:6]
+        #velocity_action = action[6:12]
+        #position_action = position_action.reshape((2,3))
+        #velocity_action = velocity_action.reshape((2,3))
+        angles = self.get_angles(position)
+        for i in range(len(position)):
+            new_angle = angles[i]+action[i]
+            distance_to_origin = distance([0,0,0], position[i])
+            position[i][0] = distance_to_origin*np.cos(new_angle)
+            position[i][1] = distance_to_origin*np.sin(new_angle)
+        
+        return position, velocity
+    
+    def get_angles(self, position):
+        angles = []
+        for i in range(len(position)):
+            angles += [np.arctan2(position[i][1], np.sign(position[i][0])*max(abs(position[i][0])+1,1))]
+        return angles
     
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_inputs):
@@ -170,10 +198,7 @@ class GravityAI:
     @torch.no_grad() 
     def simulation(self):
         memory = []
-        mass = self.system.get_initial_mass()
-        position = self.system.get_initial_position()
-        velocity = self.system.get_initial_velocity()
-        radius = self.system.get_initial_radius()
+        mass, position, velocity, radius = self.system.get_initial_state()
         time_step_count = 0
         
         while True:
@@ -187,7 +212,7 @@ class GravityAI:
                 returnMemory = []
                 for hist_mass, hist_velocity, hist_position, hist_action in memory:
                     returnMemory.append((
-                        self.system.get_encoded_state(hist_mass, hist_velocity, hist_position),
+                        self.system.get_encoded_state(hist_position),
                         hist_action
                     ))
                 return returnMemory
@@ -202,7 +227,6 @@ class GravityAI:
             
             state = torch.tensor(state, dtype=torch.float32, device=self.model.device)
             policy_targets = torch.tensor(policy_targets, dtype=torch.float32, device=self.model.device)
-            print(policy_targets)
 
             out_policy = self.model(state)
             squared_difference = (policy_targets-out_policy) ** 2
@@ -239,7 +263,7 @@ class GravityAI:
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=14)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=2)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -249,18 +273,18 @@ def learn(args, system):
 
 @torch.no_grad()
 def play(args, system, model_dict, mass, velocity, position):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=14)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=2)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
     model.eval() #playing mode
 
     action_probs = model(
-        torch.tensor(system.get_encoded_state(mass, velocity, position), device=model.device).unsqueeze(0)
+        torch.tensor(system.get_encoded_state(position), device=model.device).unsqueeze(0)
     )
     action = action_probs.squeeze(0).cpu().numpy()
     #action = action_probs.reshape(state.shape)
     
-    velocity, position = system.get_next_state(velocity, position, action)
+    position, velocity = system.get_next_state(velocity, position, action)
 
-    return velocity, position
+    return position, velocity

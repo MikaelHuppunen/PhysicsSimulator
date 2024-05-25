@@ -16,10 +16,7 @@ def print_momentum_grid(space, momentum_grid):
 
 space = ai.Space()
 
-mass = space.get_initial_mass()
-position = space.get_initial_position()
-velocity = space.get_initial_velocity()
-radius = space.get_initial_radius()
+mass, position, velocity, radius = space.get_initial_state()
 
 args = {
     'search': True,
@@ -44,7 +41,7 @@ while(waiting):
 
 running = True
 while running:
-    pygame.time.Clock().tick(6)
+    pygame.time.Clock().tick(60)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -52,9 +49,8 @@ while running:
     screen.fill((255, 255, 255))
     for i in range(len(mass)):
         pygame.draw.circle(screen, (0,0,0), (position[i][0]/scale+width/2, position[i][1]/scale+height/2), 10)
-    print(position)
     #space.simulate_next_state(mass, velocity, position, radius)
-    velocity, position = ai.play(args, space, model_dict, mass, velocity, position)
+    position, velocity = ai.play(args, space, model_dict, mass, velocity, position)
     
     pygame.display.flip()
 
