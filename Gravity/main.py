@@ -2,6 +2,7 @@ from gravity import approximate
 import ai
 import numpy as np
 import pygame
+from copy import copy, deepcopy
 
 def print_mass_grid(space, mass_grid):
     for i in range(space.row_count):
@@ -17,6 +18,7 @@ def print_momentum_grid(space, momentum_grid):
 space = ai.Space()
 
 mass, position, velocity, radius = space.get_initial_state()
+ai_mass, ai_position, ai_velocity, ai_radius = deepcopy(mass), deepcopy(position), deepcopy(velocity), deepcopy(radius)
 
 args = {
     'search': True,
@@ -48,9 +50,10 @@ while running:
             break
     screen.fill((255, 255, 255))
     for i in range(len(mass)):
-        pygame.draw.circle(screen, (0,0,0), (position[i][0]/scale+width/2, position[i][1]/scale+height/2), 10)
-    #space.simulate_next_state(mass, velocity, position, radius)
-    position, velocity = ai.play(args, space, model_dict, mass, velocity, position)
+        pygame.draw.circle(screen, (255,0,0), (position[i][0]/scale+width/2, position[i][1]/scale+height/2), 10)
+        pygame.draw.circle(screen, (0,0,0), (ai_position[i][0]/scale+width/2, ai_position[i][1]/scale+height/2), 10)
+    space.simulate_next_state(mass, velocity, position, radius)
+    ai_position, ai_velocity = ai.play(args, space, model_dict, ai_mass, ai_velocity, ai_position)
     
     pygame.display.flip()
 
