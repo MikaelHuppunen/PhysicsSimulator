@@ -19,7 +19,7 @@ from copy import copy, deepcopy
 
 def print_policy_heatmap(policy):
     for i in range(0, 64, 8):
-        slice_rounded = np.around(policy[i:i+8], decimals=4)
+        slice_rounded = np.around(policy[i:i+8], decimals=8)
         print(" ".join(["{:7.2f}".format(item) for item in slice_rounded]))
 
 def time_left(args, simulation_timer, iteration, simulation_iteration, training_timer, epoch):
@@ -37,13 +37,14 @@ def distance(position1, position2):
 class Space:
     def __init__(self):
         self.gravitational_constant = 6.67384e-11
-        self.action_size = 4
+        self.action_size = 8
         self.scale = 5e8
         self.max_mass = 1e40
         self.max_distance = 1e20
         self.speed_of_light = 299792458.0
         self.dimensions = 2
         self.time_step = 600
+        self.time_steps_per_step = 600
 
     def __repr__(self):
         return "Space"
@@ -94,43 +95,62 @@ class Space:
                 normalized_velocity[len(velocity[0])*i+j] = np.sign(velocity[i][j])*np.log(abs(velocity[i][j])+1)/np.log(self.speed_of_light)
         return normalized_velocity
 
-    def get_encoded_state(self, position):
-        #normalized_mass = self.normalize_mass(mass)
+    def get_encoded_state(self, position, velocity):
         normalized_distance = self.normalize_distance(position)
-        #normalized_velocity = self.normalize_velocity(velocity)
+        radial_velocity = np.array(self.get_radial_velocity(position, velocity))
+        angular_velocity = np.array(self.get_angular_velocity(position, velocity))
 
-        encoded_state = np.concatenate((normalized_distance,np.array(self.get_angles(position)))).astype(np.float32)
+        encoded_state = np.concatenate((normalized_distance,np.array(self.get_angles(position)),radial_velocity,angular_velocity)).astype(np.float32)
         return encoded_state
     
     def simulate_next_state(self, mass, velocity, position, radius):
-        for i in range(600):
+        for i in range(self.time_steps_per_step):
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
 
     def simulate_action(self, mass, velocity, position, radius):
         old_distances = self.normalize_distance(position)
         old_angles = self.get_angles(position)
+        old_radial_velocity = self.get_radial_velocity(position, velocity)
+        old_angular_velocity = self.get_angular_velocity(position, velocity)
 
         self.simulate_next_state(mass, velocity, position, radius)
 
         angles = self.get_angles(position)
         distances = self.normalize_distance(position)
+        radial_velocity = self.get_radial_velocity(position, velocity)
+        angular_velocity = self.get_angular_velocity(position, velocity)
 
         distance_action = np.array(distances)-np.array(old_distances)
         angle_action = np.array(angles)-np.array(old_angles)
+        radial_velocity_action = np.array(radial_velocity)-np.array(old_radial_velocity)
+        angular_velocity_action = np.array(angular_velocity)-np.array(old_angular_velocity)
+
         angle_action = (angle_action + np.pi) % (2 * np.pi) - np.pi
-        action = np.concatenate((distance_action, angle_action))
+
+        action = np.concatenate((distance_action, angle_action, radial_velocity_action, angular_velocity_action))
         return action
     
     def get_next_state(self, velocity, position, action):
         distance_action = action[0:2]
         angle_action = action[2:4]
+        radial_velocity_action = action[4:6]
+        angular_velocity_action = action[6:8]
+
         angles = self.get_angles(position)
+        radial_velocities = self.get_radial_velocity(position, velocity)
+        angular_velocities = self.get_angular_velocity(position, velocity)
         for i in range(len(position)):
             new_angle = angles[i]+angle_action[i]
+            radial_velocity = self.scale*(radial_velocities[i]+radial_velocity_action[i])/(self.time_step*self.time_steps_per_step)
+            angular_velocity = (angular_velocities[i]+angular_velocity_action[i])/(self.time_step*self.time_steps_per_step)
+            
             distance_to_origin = distance([0,0,0], position[i])
             distance_to_origin += distance_action[i]*self.scale
+
             position[i][0] = distance_to_origin*np.cos(new_angle)
             position[i][1] = distance_to_origin*np.sin(new_angle)
+            velocity[i][0] = radial_velocity*np.cos(new_angle)-distance_to_origin*angular_velocity*np.sin(new_angle)
+            velocity[i][1] = radial_velocity*np.sin(new_angle)+distance_to_origin*angular_velocity*np.cos(new_angle)
         
         return position, velocity
     
@@ -140,6 +160,20 @@ class Space:
             angles += [np.arctan2(position[i][1], np.sign(position[i][0])*max(abs(position[i][0])+1,1))]
         return angles
     
+    def get_angular_velocity(self, position, velocity):
+        angular_velocities = []
+        for i in range(len(position)):
+            angular_velocities += [self.time_step*self.time_steps_per_step*(position[i][0]*velocity[i][1]-position[i][1]*velocity[i][0])/(np.linalg.norm(position[i])**2)]
+        
+        return angular_velocities
+    
+    def get_radial_velocity(self, position, velocity):
+        radial_velocities = []
+        for i in range(len(position)):
+            radial_velocities += [self.time_step*self.time_steps_per_step*np.dot(velocity[i], position[i])/(self.scale*np.linalg.norm(position[i]))]
+        
+        return radial_velocities
+
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_inputs):
         super().__init__() #initiates the parent class
@@ -209,7 +243,7 @@ class GravityAI:
                 returnMemory = []
                 for hist_mass, hist_velocity, hist_position, hist_action in memory:
                     returnMemory.append((
-                        self.system.get_encoded_state(hist_position),
+                        self.system.get_encoded_state(hist_position, hist_velocity),
                         hist_action
                     ))
                 return returnMemory
@@ -260,7 +294,7 @@ class GravityAI:
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=4)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=8)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -270,14 +304,14 @@ def learn(args, system):
 
 @torch.no_grad()
 def play(args, system, model_dict, mass, velocity, position):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=4)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=8)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
     model.eval() #playing mode
 
     action_probs = model(
-        torch.tensor(system.get_encoded_state(position), device=model.device).unsqueeze(0)
+        torch.tensor(system.get_encoded_state(position, velocity), device=model.device).unsqueeze(0)
     )
     action = action_probs.squeeze(0).cpu().numpy()
     #action = action_probs.reshape(state.shape)
