@@ -2,7 +2,7 @@ from ai import *
 
 args = {
     'num_iterations': 1,
-    'num_simulation_iterations': 32,
+    'num_simulation_iterations': 64,
     'max_time_steps': 1000,
     'num_parallel_systems': 100,
     'num_epochs': 32,

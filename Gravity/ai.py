@@ -19,7 +19,7 @@ from copy import copy, deepcopy
 
 def print_policy_heatmap(policy):
     for i in range(0, 64, 8):
-        slice_rounded = np.around(policy[i:i+8], decimals=2)
+        slice_rounded = np.around(policy[i:i+8], decimals=4)
         print(" ".join(["{:7.2f}".format(item) for item in slice_rounded]))
 
 def time_left(args, simulation_timer, iteration, simulation_iteration, training_timer, epoch):
@@ -37,11 +37,8 @@ def distance(position1, position2):
 class Space:
     def __init__(self):
         self.gravitational_constant = 6.67384e-11
-        self.row_count = 20
-        self.column_count = 20
-        self.action_size = 2
-        self.grid_width = 4e11
-        self.meters_per_pixel = self.grid_width/self.column_count
+        self.action_size = 4
+        self.scale = 5e8
         self.max_mass = 1e40
         self.max_distance = 1e20
         self.speed_of_light = 299792458.0
@@ -56,12 +53,12 @@ class Space:
         return mass
     
     def get_initial_position(self, angle):
-        position = [[1000,0,0]]
+        position = [[-np.cos(angle)*4.51e5,-np.sin(angle)*4.51e5,0]]
         position += [[np.cos(angle)*1.5210e11,np.sin(angle)*1.5210e11,0]]
         return position
     
     def get_initial_velocity(self, angle):
-        velocity = [[0,0,0]]
+        velocity = [[-np.cos(angle)*8.69e-2,-np.sin(angle)*8.69e-2,0]]
         velocity += [[np.cos(angle)*2.929e4,np.sin(angle)*2.929e4,0]]
         return velocity
     
@@ -84,12 +81,11 @@ class Space:
             normalized_mass[i] = np.log(mass[i]+1)/np.log(self.max_mass)
         return normalized_mass
     
-    def normalize_position(self, position):
-        normalized_position = np.zeros(len(position)*len(position[0]))
+    def normalize_distance(self, position):
+        normalized_distance = np.zeros(len(position))
         for i in range(len(position)):
-            for j in range(len(position[0])):
-                normalized_position[len(position[0])*i+j] = np.sign(position[i][j])*np.log(abs(position[i][j])+1)/np.log(self.max_distance)
-        return normalized_position
+            normalized_distance[i] = distance([0,0,0], position[i])/self.scale
+        return normalized_distance
     
     def normalize_velocity(self, velocity):
         normalized_velocity = np.zeros(len(velocity)*len(velocity[0]))
@@ -100,10 +96,10 @@ class Space:
 
     def get_encoded_state(self, position):
         #normalized_mass = self.normalize_mass(mass)
-        #normalized_position = self.normalize_position(position)
+        normalized_distance = self.normalize_distance(position)
         #normalized_velocity = self.normalize_velocity(velocity)
 
-        encoded_state = np.array(self.get_angles(position)).astype(np.float32)
+        encoded_state = np.concatenate((normalized_distance,np.array(self.get_angles(position)))).astype(np.float32)
         return encoded_state
     
     def simulate_next_state(self, mass, velocity, position, radius):
@@ -111,27 +107,28 @@ class Space:
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
 
     def simulate_action(self, mass, velocity, position, radius):
-        #old_velocity = deepcopy(velocity)
-        #old_position = deepcopy(position)
+        old_distances = self.normalize_distance(position)
         old_angles = self.get_angles(position)
+
         self.simulate_next_state(mass, velocity, position, radius)
+
         angles = self.get_angles(position)
-        action = np.array(angles)-np.array(old_angles)
-        action = (action + np.pi) % (2 * np.pi) - np.pi
-        #position_action = (self.normalize_position(position)-self.normalize_position(old_position))
-        #velocity_action = (self.normalize_velocity(velocity)-self.normalize_velocity(old_velocity))
-        #action = np.concatenate((position_action,velocity_action))
+        distances = self.normalize_distance(position)
+
+        distance_action = np.array(distances)-np.array(old_distances)
+        angle_action = np.array(angles)-np.array(old_angles)
+        angle_action = (angle_action + np.pi) % (2 * np.pi) - np.pi
+        action = np.concatenate((distance_action, angle_action))
         return action
     
     def get_next_state(self, velocity, position, action):
-        #position_action = action[0:6]
-        #velocity_action = action[6:12]
-        #position_action = position_action.reshape((2,3))
-        #velocity_action = velocity_action.reshape((2,3))
+        distance_action = action[0:2]
+        angle_action = action[2:4]
         angles = self.get_angles(position)
         for i in range(len(position)):
-            new_angle = angles[i]+action[i]
+            new_angle = angles[i]+angle_action[i]
             distance_to_origin = distance([0,0,0], position[i])
+            distance_to_origin += distance_action[i]*self.scale
             position[i][0] = distance_to_origin*np.cos(new_angle)
             position[i][1] = distance_to_origin*np.sin(new_angle)
         
@@ -263,7 +260,7 @@ class GravityAI:
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=2)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=4)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -273,7 +270,7 @@ def learn(args, system):
 
 @torch.no_grad()
 def play(args, system, model_dict, mass, velocity, position):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=2)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=4)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
