@@ -26,7 +26,7 @@ def approximate(delta_t, mass, velocity, position, radius, gravitational_constan
             velocity[i][axel] += delta_t*acceleration[axel]
             position[i][axel] += delta_t*velocity[i][axel]
 
-def total_energy():
+def total_energy(mass, velocity, position, gravitational_constant):
     energy = 0
     for i in range(len(mass)):
         energy += 1/2*mass[i]*(velocity[i][0]**2+velocity[i][1]**2+velocity[i][2]**2)

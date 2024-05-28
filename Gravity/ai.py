@@ -14,12 +14,12 @@ torch.manual_seed(0) #set the same seed for pytorch every time to ensure reprodu
 import random
 import math
 import time
-from gravity import approximate
+from gravity import approximate, gravity
 from copy import copy, deepcopy
 
 def print_policy_heatmap(policy):
     for i in range(0, 64, 8):
-        slice_rounded = np.around(policy[i:i+8], decimals=8)
+        slice_rounded = np.around(policy[i:i+8], decimals=12)
         print(" ".join(["{:7.2f}".format(item) for item in slice_rounded]))
 
 def time_left(args, simulation_timer, iteration, simulation_iteration, training_timer, epoch):
@@ -71,7 +71,8 @@ class Space:
         random_angle = random.uniform(-math.pi, math.pi)
         mass = self.get_initial_mass()
         position = self.get_initial_position(random_angle)
-        velocity = self.get_initial_velocity(random_angle+np.pi/2)
+        random_angle = random.uniform(random_angle-(math.pi-0.1), random_angle+(math.pi-0.1))
+        velocity = self.get_initial_velocity(random_angle)
         radius = self.get_initial_radius()
 
         return mass, position, velocity, radius
@@ -95,12 +96,15 @@ class Space:
                 normalized_velocity[len(velocity[0])*i+j] = np.sign(velocity[i][j])*np.log(abs(velocity[i][j])+1)/np.log(self.speed_of_light)
         return normalized_velocity
 
-    def get_encoded_state(self, position, velocity):
+    def get_encoded_state(self, mass, position, velocity, radius):
         normalized_distance = self.normalize_distance(position)
         radial_velocity = np.array(self.get_radial_velocity(position, velocity))
         angular_velocity = np.array(self.get_angular_velocity(position, velocity))
+        acceleration = self.get_acceleration(mass, position, radius)
+        radial_acceleration = np.array(self.get_radial_acceleration(position, velocity, acceleration, radial_velocity))
+        angular_acceleration = np.array(self.get_angular_acceleration(position, acceleration, radial_velocity, angular_velocity))
 
-        encoded_state = np.concatenate((normalized_distance,np.array(self.get_angles(position)),radial_velocity,angular_velocity)).astype(np.float32)
+        encoded_state = np.concatenate((normalized_distance,np.array(self.get_angles(position)),radial_velocity,angular_velocity, radial_acceleration, angular_acceleration)).astype(np.float32)
         return encoded_state
     
     def simulate_next_state(self, mass, velocity, position, radius):
@@ -173,7 +177,28 @@ class Space:
             radial_velocities += [self.time_step*self.time_steps_per_step*np.dot(velocity[i], position[i])/(self.scale*np.linalg.norm(position[i]))]
         
         return radial_velocities
-
+    
+    def get_acceleration(self, mass, position, radius):
+        acceleration = []
+        for i in range(len(position)):
+            acceleration += [np.array(gravity(i, self.gravitational_constant, mass, position, radius))*(self.time_step*self.time_steps_per_step)**2]
+        
+        return acceleration
+    
+    def get_radial_acceleration(self, position, velocity, acceleration, radial_velocity):
+        radial_acceleration = []
+        for i in range(len(position)):
+            radial_acceleration += [(np.dot(acceleration[i], position[i])-(self.scale*radial_velocity[i])**2+(self.time_step*self.time_steps_per_step*np.linalg.norm(velocity[i]))**2)/(self.scale*np.linalg.norm(position[i]))]
+        
+        return radial_acceleration
+    
+    def get_angular_acceleration(self, position, acceleration, radial_velocity, angular_velocity):
+        angular_acceleration = []
+        for i in range(len(position)):
+            angular_acceleration += [(position[i][0]*acceleration[i][1]-position[i][1]*acceleration[i][0])/(np.linalg.norm(position[i])**2)-2*self.scale*radial_velocity[i]*angular_velocity[i]/np.linalg.norm(position[i])]
+        
+        return angular_acceleration
+    
 class ResNet(nn.Module):
     def __init__(self, system, num_resBlocks, num_hidden, device, number_of_inputs):
         super().__init__() #initiates the parent class
@@ -235,7 +260,7 @@ class GravityAI:
         while True:
             action = self.system.simulate_action(mass, velocity, position, radius)
             
-            memory.append((mass, velocity, position, action))
+            memory.append((deepcopy(mass), deepcopy(velocity), deepcopy(position), deepcopy(action)))
 
             time_step_count += 1
             
@@ -243,7 +268,7 @@ class GravityAI:
                 returnMemory = []
                 for hist_mass, hist_velocity, hist_position, hist_action in memory:
                     returnMemory.append((
-                        self.system.get_encoded_state(hist_position, hist_velocity),
+                        self.system.get_encoded_state(hist_mass, hist_position, hist_velocity, radius),
                         hist_action
                     ))
                 return returnMemory
@@ -294,7 +319,7 @@ class GravityAI:
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=8)
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=12)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
@@ -303,15 +328,15 @@ def learn(args, system):
     print(f"learning time: {time.time()-start_time}s")
 
 @torch.no_grad()
-def play(args, system, model_dict, mass, velocity, position):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=8)
+def play(args, system, model_dict, mass, velocity, position, radius):
+    model = ResNet(system, 8, 64, device=device, number_of_inputs=12)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
     model.eval() #playing mode
 
     action_probs = model(
-        torch.tensor(system.get_encoded_state(position, velocity), device=model.device).unsqueeze(0)
+        torch.tensor(system.get_encoded_state(mass, position, velocity, radius), device=model.device).unsqueeze(0)
     )
     action = action_probs.squeeze(0).cpu().numpy()
     #action = action_probs.reshape(state.shape)
