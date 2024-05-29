@@ -22,14 +22,23 @@ def print_policy_heatmap(policy):
         slice_rounded = np.around(policy[i:i+8], decimals=12)
         print(" ".join(["{:7.2f}".format(item) for item in slice_rounded]))
 
-def time_left(args, simulation_timer, iteration, simulation_iteration, training_timer, epoch):
-    simulation_time_left = simulation_timer*(args['num_iterations']*args['num_simulation_iterations']-iteration*args['num_simulation_iterations']-simulation_iteration-1+0.01)/(iteration*args['num_simulation_iterations']+simulation_iteration+1+0.01)
-    training_time_left = training_timer*(args['num_iterations']*args['num_epochs']-iteration*args['num_epochs']-epoch-1+0.01)/(iteration*args['num_epochs']+epoch+1+0.01)
-    seconds = simulation_time_left+training_time_left
+def HHMMSS(seconds):
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     seconds = seconds % 60
     return '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
+
+def time_left(args, simulation_timer, iteration, simulation_iteration, training_timer, epoch):
+    simulation_time_left = simulation_timer*(args['num_iterations']*args['num_simulation_iterations']-iteration*args['num_simulation_iterations']-simulation_iteration-1+0.01)/(iteration*args['num_simulation_iterations']+simulation_iteration+1+0.01)
+    training_time_left = training_timer*(args['num_iterations']*args['num_epochs']-iteration*args['num_epochs']-epoch-1+0.01)/(iteration*args['num_epochs']+epoch+1+0.01)
+    seconds = simulation_time_left+training_time_left
+    return HHMMSS(seconds)
+
+def overfitting_warning(args, system, number_of_inputs, hidden_layer_size, output_size, number_of_hidden_layers):
+    number_of_parameters = number_of_inputs*hidden_layer_size+7*(hidden_layer_size**2)+(hidden_layer_size**2)/2+hidden_layer_size/2*output_size+number_of_hidden_layers*hidden_layer_size+hidden_layer_size/2+output_size
+    number_of_training_samples = args['num_iterations']*args['num_simulation_iterations']*((args['max_time_steps']-1)*system.datapoints_per_step+1)
+    if number_of_training_samples < 10*number_of_parameters:
+        print(f"WARNING: risk of overfitting - consider adding more training samples ({int(number_of_parameters)} parameters, {number_of_training_samples} training samples). At least {int(np.ceil(10*number_of_parameters))} traning samples recommended")
 
 def distance(position1, position2):
     return max(np.sqrt((position1[0]-position2[0])**2+(position1[1]-position2[1])**2),1)
@@ -196,10 +205,10 @@ class ResNet(nn.Module):
         )
         
         self.policyHead = nn.Sequential(
-            nn.Linear(num_hidden, 32),
-            nn.BatchNorm1d(32),
+            nn.Linear(num_hidden, int(num_hidden/2)),
+            nn.BatchNorm1d(int(num_hidden/2)),
             nn.ReLU(),
-            nn.Linear(32, system.action_size) #linear transformation(input size, output size)
+            nn.Linear(int(num_hidden/2), system.action_size) #linear transformation(input size, output size)
         )
         
         self.to(device) #move to the device where you want to run the operations
@@ -269,7 +278,6 @@ class GravityAI:
                 action = np.concatenate((distance_action, angle_action, radial_velocity_action, angular_velocity_action))
                 
                 memory.append((deepcopy(mass), deepcopy(velocity), deepcopy(position), deepcopy(action)))
-            
             if time_step_count/self.system.datapoints_per_step >= self.args['max_time_steps']:
                 returnMemory = []
                 for hist_mass, hist_velocity, hist_position, hist_action in memory:
@@ -281,6 +289,7 @@ class GravityAI:
                 
     def train(self, memory):
         random.shuffle(memory)
+        total_loss, number_of_batches = 0,0
         for batchIdx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batchIdx:min(len(memory) - 1, batchIdx + self.args['batch_size'])] # Change to memory[batchIdx:batchIdx+self.args['batch_size']] in case of an error
             state, policy_targets = zip(*sample)
@@ -298,7 +307,10 @@ class GravityAI:
             loss.backward()
             self.optimizer.step()
 
-        print(loss.item())
+            total_loss += loss.item()
+            number_of_batches += 1
+
+        print(f"average loss: {total_loss/number_of_batches}")
     
     def learn(self):
         start = time.time()
@@ -331,7 +343,8 @@ def learn(args, system):
     gravityai = GravityAI(model, optimizer, system, args)
     start_time = time.time()
     gravityai.learn()
-    print(f"learning time: {time.time()-start_time}s")
+    overfitting_warning(args, system, 12, 64, 8, 8)
+    print(f"learning time: {HHMMSS(time.time()-start_time)}s")
 
 @torch.no_grad()
 def play(args, system, model_dict, mass, velocity, position, radius):
