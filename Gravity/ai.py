@@ -45,6 +45,7 @@ class Space:
         self.dimensions = 2
         self.time_step = 600
         self.time_steps_per_step = 600
+        self.datapoints_per_step = 10
 
     def __repr__(self):
         return "Space"
@@ -107,32 +108,11 @@ class Space:
         encoded_state = np.concatenate((normalized_distance,np.array(self.get_angles(position)),radial_velocity,angular_velocity, radial_acceleration, angular_acceleration)).astype(np.float32)
         return encoded_state
     
-    def simulate_next_state(self, mass, velocity, position, radius):
-        for i in range(self.time_steps_per_step):
+    def simulate_next_state(self, mass, velocity, position, radius, number_of_time_steps=0):
+        if(number_of_time_steps == 0):
+            number_of_time_steps = self.time_steps_per_step
+        for i in range(number_of_time_steps):
             approximate(self.time_step, mass, velocity, position, radius, self.gravitational_constant)
-
-    def simulate_action(self, mass, velocity, position, radius):
-        old_distances = self.normalize_distance(position)
-        old_angles = self.get_angles(position)
-        old_radial_velocity = self.get_radial_velocity(position, velocity)
-        old_angular_velocity = self.get_angular_velocity(position, velocity)
-
-        self.simulate_next_state(mass, velocity, position, radius)
-
-        angles = self.get_angles(position)
-        distances = self.normalize_distance(position)
-        radial_velocity = self.get_radial_velocity(position, velocity)
-        angular_velocity = self.get_angular_velocity(position, velocity)
-
-        distance_action = np.array(distances)-np.array(old_distances)
-        angle_action = np.array(angles)-np.array(old_angles)
-        radial_velocity_action = np.array(radial_velocity)-np.array(old_radial_velocity)
-        angular_velocity_action = np.array(angular_velocity)-np.array(old_angular_velocity)
-
-        angle_action = (angle_action + np.pi) % (2 * np.pi) - np.pi
-
-        action = np.concatenate((distance_action, angle_action, radial_velocity_action, angular_velocity_action))
-        return action
     
     def get_next_state(self, velocity, position, action):
         distance_action = action[0:2]
@@ -257,14 +237,40 @@ class GravityAI:
         mass, position, velocity, radius = self.system.get_initial_state()
         time_step_count = 0
         
+        old_distances, old_angles, old_radial_velocity, old_angular_velocity = [], [], [], []
+        for i in range(self.system.datapoints_per_step):
+            old_distances += [[]]
+            old_angles += [[]]
+            old_radial_velocity += [[]]
+            old_angular_velocity += [[]]
+
         while True:
-            action = self.system.simulate_action(mass, velocity, position, radius)
+            old_distances[time_step_count%self.system.datapoints_per_step] = self.system.normalize_distance(position)
+            old_angles[time_step_count%self.system.datapoints_per_step] = self.system.get_angles(position)
+            old_radial_velocity[time_step_count%self.system.datapoints_per_step] = self.system.get_radial_velocity(position, velocity)
+            old_angular_velocity[time_step_count%self.system.datapoints_per_step] = self.system.get_angular_velocity(position, velocity)
             
-            memory.append((deepcopy(mass), deepcopy(velocity), deepcopy(position), deepcopy(action)))
+            self.system.simulate_next_state(mass, velocity, position, radius, int(self.system.time_steps_per_step/self.system.datapoints_per_step))
 
             time_step_count += 1
+            if(time_step_count >= self.system.datapoints_per_step):
+                angles = self.system.get_angles(position)
+                distances = self.system.normalize_distance(position)
+                radial_velocity = self.system.get_radial_velocity(position, velocity)
+                angular_velocity = self.system.get_angular_velocity(position, velocity)
+
+                distance_action = np.array(distances)-np.array(old_distances[time_step_count%self.system.datapoints_per_step])
+                angle_action = np.array(angles)-np.array(old_angles[time_step_count%self.system.datapoints_per_step])
+                radial_velocity_action = np.array(radial_velocity)-np.array(old_radial_velocity[time_step_count%self.system.datapoints_per_step])
+                angular_velocity_action = np.array(angular_velocity)-np.array(old_angular_velocity[time_step_count%self.system.datapoints_per_step])
+
+                angle_action = (angle_action + np.pi) % (2 * np.pi) - np.pi
+
+                action = np.concatenate((distance_action, angle_action, radial_velocity_action, angular_velocity_action))
+                
+                memory.append((deepcopy(mass), deepcopy(velocity), deepcopy(position), deepcopy(action)))
             
-            if time_step_count >= self.args['max_time_steps']:
+            if time_step_count/self.system.datapoints_per_step >= self.args['max_time_steps']:
                 returnMemory = []
                 for hist_mass, hist_velocity, hist_position, hist_action in memory:
                     returnMemory.append((
