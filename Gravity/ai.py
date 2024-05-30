@@ -195,7 +195,6 @@ class ResNet(nn.Module):
         self.device = device
         self.startBlock = nn.Sequential(
             nn.Linear(number_of_inputs, num_hidden),
-            nn.BatchNorm1d(num_hidden), #normalize output
             nn.ReLU()
         )
         
@@ -206,7 +205,6 @@ class ResNet(nn.Module):
         
         self.policyHead = nn.Sequential(
             nn.Linear(num_hidden, int(num_hidden/2)),
-            nn.BatchNorm1d(int(num_hidden/2)),
             nn.ReLU(),
             nn.Linear(int(num_hidden/2), system.action_size) #linear transformation(input size, output size)
         )
@@ -225,10 +223,9 @@ class ResBlock(nn.Module):
     def __init__(self, num_hidden):
         super().__init__()
         self.fc = nn.Linear(num_hidden, num_hidden)
-        self.bn = nn.BatchNorm1d(num_hidden)
         
     def forward(self, x):
-        x = F.relu(self.bn(self.fc(x)))
+        x = F.relu(self.fc(x))
         return x
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
