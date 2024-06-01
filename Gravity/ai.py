@@ -18,7 +18,7 @@ from gravity import approximate, gravity
 from copy import copy, deepcopy
 
 def print_policy_heatmap(policy):
-    for i in range(0, 64, 8):
+    for i in range(0, 128, 8):
         slice_rounded = np.around(policy[i:i+8], decimals=12)
         print(" ".join(["{:7.2f}".format(item) for item in slice_rounded]))
 
@@ -63,9 +63,9 @@ class Space:
         mass = [1.9891e30, 5.9e24]
         return mass
     
-    def get_initial_position(self, angle):
-        position = [[-np.cos(angle)*4.51e5,-np.sin(angle)*4.51e5,0]]
-        position += [[np.cos(angle)*1.5210e11,np.sin(angle)*1.5210e11,0]]
+    def get_initial_position(self, angle, multiplier):
+        position = [[-multiplier*np.cos(angle)*4.51e5,-multiplier*np.sin(angle)*4.51e5,0]]
+        position += [[multiplier*np.cos(angle)*1.5210e11,multiplier*np.sin(angle)*1.5210e11,0]]
         return position
     
     def get_initial_velocity(self, angle):
@@ -79,9 +79,12 @@ class Space:
     
     def get_initial_state(self):
         random_angle = random.uniform(-math.pi, math.pi)
+        #random_multiplier = 1
+        random_multiplier = random.uniform(0.9, 1.1)
         mass = self.get_initial_mass()
-        position = self.get_initial_position(random_angle)
-        random_angle = random.uniform(random_angle-(math.pi-0.1), random_angle+(math.pi-0.1))
+        position = self.get_initial_position(random_angle, random_multiplier)
+        random_angle += math.pi/2
+        #random_angle = random.uniform(random_angle-(math.pi-0.1), random_angle+(math.pi-0.1))
         velocity = self.get_initial_velocity(random_angle)
         radius = self.get_initial_radius()
 
@@ -195,7 +198,7 @@ class ResNet(nn.Module):
         self.device = device
         self.startBlock = nn.Sequential(
             nn.Linear(number_of_inputs, num_hidden),
-            nn.ReLU()
+            nn.PReLU()
         )
         
         #create a backbone for neural network by creating multiple Resblocks
@@ -205,7 +208,7 @@ class ResNet(nn.Module):
         
         self.policyHead = nn.Sequential(
             nn.Linear(num_hidden, int(num_hidden/2)),
-            nn.ReLU(),
+            nn.PReLU(),
             nn.Linear(int(num_hidden/2), system.action_size) #linear transformation(input size, output size)
         )
         
@@ -222,10 +225,13 @@ class ResNet(nn.Module):
 class ResBlock(nn.Module):
     def __init__(self, num_hidden):
         super().__init__()
-        self.fc = nn.Linear(num_hidden, num_hidden)
+        self.layer = nn.Sequential(
+            nn.Linear(num_hidden, num_hidden),
+            nn.PReLU()
+        )
         
     def forward(self, x):
-        x = F.relu(self.fc(x))
+        x = self.layer(x)
         return x
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -334,18 +340,18 @@ class GravityAI:
             #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=12)
+    model = ResNet(system, 8, 128, device=device, number_of_inputs=12)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     model.train()
     gravityai = GravityAI(model, optimizer, system, args)
     start_time = time.time()
     gravityai.learn()
-    overfitting_warning(args, system, 12, 64, 8, 8)
+    overfitting_warning(args, system, 12, 128, 8, 8)
     print(f"learning time: {HHMMSS(time.time()-start_time)}s")
 
 @torch.no_grad()
 def play(args, system, model_dict, mass, velocity, position, radius):
-    model = ResNet(system, 8, 64, device=device, number_of_inputs=12)
+    model = ResNet(system, 8, 128, device=device, number_of_inputs=12)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     #load previously learned values
     model.load_state_dict(torch.load(model_dict, map_location=device))
