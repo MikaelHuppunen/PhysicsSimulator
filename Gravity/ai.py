@@ -35,7 +35,7 @@ def time_left(args, simulation_timer, iteration, simulation_iteration, training_
     return HHMMSS(seconds)
 
 def overfitting_warning(args, system, number_of_inputs, hidden_layer_size, output_size, number_of_hidden_layers):
-    number_of_parameters = number_of_inputs*hidden_layer_size+7*(hidden_layer_size**2)+(hidden_layer_size**2)/2+hidden_layer_size/2*output_size+number_of_hidden_layers*hidden_layer_size+hidden_layer_size/2+output_size
+    number_of_parameters = number_of_inputs*hidden_layer_size+7*(hidden_layer_size**2)+(hidden_layer_size**2)/2+hidden_layer_size/2*output_size+number_of_hidden_layers*hidden_layer_size+hidden_layer_size/2+output_size+(number_of_hidden_layers+2)
     number_of_training_samples = args['num_iterations']*args['num_simulation_iterations']*((args['max_time_steps']-1)*system.datapoints_per_step+1)
     if number_of_training_samples < 10*number_of_parameters:
         print(f"WARNING: risk of overfitting - consider adding more training samples ({int(number_of_parameters)} parameters, {number_of_training_samples} training samples). At least {int(np.ceil(10*number_of_parameters))} traning samples recommended")
@@ -68,9 +68,9 @@ class Space:
         position += [[multiplier*np.cos(angle)*1.5210e11,multiplier*np.sin(angle)*1.5210e11,0]]
         return position
     
-    def get_initial_velocity(self, angle):
-        velocity = [[-np.cos(angle)*8.69e-2,-np.sin(angle)*8.69e-2,0]]
-        velocity += [[np.cos(angle)*2.929e4,np.sin(angle)*2.929e4,0]]
+    def get_initial_velocity(self, angle, multiplier):
+        velocity = [[-multiplier*np.cos(angle)*8.69e-2,-multiplier*np.sin(angle)*8.69e-2,0]]
+        velocity += [[multiplier*np.cos(angle)*2.929e4,multiplier*np.sin(angle)*2.929e4,0]]
         return velocity
     
     def get_initial_radius(self):   
@@ -79,13 +79,21 @@ class Space:
     
     def get_initial_state(self):
         random_angle = random.uniform(-math.pi, math.pi)
-        #random_multiplier = 1
-        random_multiplier = random.uniform(0.9, 1.1)
+        random_distance_multiplier = random.uniform(0.9, 1.1)
+        random_velocity_multiplier = random.uniform(0.9, 1.1)
+
         mass = self.get_initial_mass()
-        position = self.get_initial_position(random_angle, random_multiplier)
-        random_angle += math.pi/2
-        #random_angle = random.uniform(random_angle-(math.pi-0.1), random_angle+(math.pi-0.1))
-        velocity = self.get_initial_velocity(random_angle)
+        position = self.get_initial_position(random_angle, random_distance_multiplier)
+        random_angle += math.pi/2+random.uniform(-(math.pi/16-0.1), (math.pi/16-0.1))
+        velocity = self.get_initial_velocity(random_angle, random_velocity_multiplier)
+        radius = self.get_initial_radius()
+
+        return mass, position, velocity, radius
+    
+    def get_earth_state(self):
+        mass = self.get_initial_mass()
+        position = self.get_initial_position(0, 1)
+        velocity = self.get_initial_velocity(math.pi/2, 1)
         radius = self.get_initial_radius()
 
         return mass, position, velocity, radius

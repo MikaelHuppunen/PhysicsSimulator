@@ -17,7 +17,9 @@ def print_momentum_grid(space, momentum_grid):
 
 space = ai.Space()
 
-mass, position, velocity, radius = space.get_initial_state()
+#mass, position, velocity, radius = space.get_initial_state()
+mass, position, velocity, radius = space.get_earth_state()
+
 ai_mass, ai_position, ai_velocity, ai_radius = deepcopy(mass), deepcopy(position), deepcopy(velocity), deepcopy(radius)
 
 total_energy_at_start = total_energy(mass, velocity, position, space.gravitational_constant)
@@ -51,8 +53,8 @@ while running:
             break
     screen.fill((255, 255, 255))
     for i in range(len(mass)):
-        pygame.draw.circle(screen, (255,0,0), (position[i][0]/space.scale+width/2, position[i][1]/space.scale+height/2), 10)
-        pygame.draw.circle(screen, (0,0,0), (ai_position[i][0]/space.scale+width/2, ai_position[i][1]/space.scale+height/2), 10)
+        pygame.draw.circle(screen, (255,0,0), (position[i][0]/(2*space.scale)+width/2, position[i][1]/(2*space.scale)+height/2), 10)
+        pygame.draw.circle(screen, (0,0,0), (ai_position[i][0]/(2*space.scale)+width/2, ai_position[i][1]/(2*space.scale)+height/2), 10)
     space.simulate_next_state(mass, velocity, position, radius)
     ai_position, ai_velocity = ai.play(args, space, model_dict, ai_mass, ai_velocity, ai_position, ai_radius)
 
