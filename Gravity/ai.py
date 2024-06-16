@@ -257,19 +257,23 @@ class GravityAI:
         mass, position, velocity, radius = self.system.get_initial_state()
         time_step_count = 0
         
-        old_distances, old_angles, old_radial_velocity, old_angular_velocity = [], [], [], []
+        old_distances, old_angles, old_radial_velocity, old_angular_velocity, old_positions, old_velocities = [], [], [], [], [], []
         for i in range(self.system.datapoints_per_step):
             old_distances += [[]]
             old_angles += [[]]
             old_radial_velocity += [[]]
             old_angular_velocity += [[]]
+            old_positions += [[]]
+            old_velocities += [[]]
 
         while True:
             old_distances[time_step_count%self.system.datapoints_per_step] = self.system.normalize_distance(position)
             old_angles[time_step_count%self.system.datapoints_per_step] = self.system.get_angles(position)
             old_radial_velocity[time_step_count%self.system.datapoints_per_step] = self.system.get_radial_velocity(position, velocity)
             old_angular_velocity[time_step_count%self.system.datapoints_per_step] = self.system.get_angular_velocity(position, velocity)
-            
+            old_positions[time_step_count%self.system.datapoints_per_step] = deepcopy(position)
+            old_velocities[time_step_count%self.system.datapoints_per_step] = deepcopy(velocity)
+
             self.system.simulate_next_state(mass, velocity, position, radius, int(self.system.time_steps_per_step/self.system.datapoints_per_step))
 
             time_step_count += 1
@@ -288,7 +292,7 @@ class GravityAI:
 
                 action = np.concatenate((distance_action, angle_action, radial_velocity_action, angular_velocity_action))
                 
-                memory.append((deepcopy(mass), deepcopy(velocity), deepcopy(position), deepcopy(action)))
+                memory.append((deepcopy(mass), deepcopy(old_velocities[time_step_count%self.system.datapoints_per_step]), deepcopy(old_positions[time_step_count%self.system.datapoints_per_step]), deepcopy(action)))
             if time_step_count/self.system.datapoints_per_step >= self.args['max_time_steps']:
                 returnMemory = []
                 for hist_mass, hist_velocity, hist_position, hist_action in memory:
