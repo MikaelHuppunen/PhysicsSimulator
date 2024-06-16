@@ -393,10 +393,12 @@ public:
                 auto stop = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
                 simulation_timer += duration.count()/1000000.0;
-                std::cout << iteration+1 << '/' << number_of_iterations << ':' << 100.0*(static_cast<double>(simulation_iteration)+1.0)/static_cast<double>(number_of_simulation_iterations) << "%, estimated time left: " << time_left(number_of_iterations, number_of_simulation_iterations, simulation_timer, iteration, simulation_iteration) << 's' << '\n';
+                if(simulation_iteration%10 == 0){
+                    std::cout << iteration+1 << '/' << number_of_iterations << ':' << 100.0*(static_cast<double>(simulation_iteration)+1.0)/static_cast<double>(number_of_simulation_iterations) << "%, estimated time left: " << time_left(number_of_iterations, number_of_simulation_iterations, simulation_timer, iteration, simulation_iteration) << 's' << '\n';
+                }
             }
         }
-        write_memory_to_file("test.txt", memory);
+        write_memory_to_file("simulation.json", memory);
     }
 };
 
@@ -412,7 +414,7 @@ void learn(int max_time_steps, int number_of_iterations, int number_of_simulatio
 int main(){
     int max_time_steps = 10;
     int number_of_iterations = 1;
-    int number_of_simulation_iterations = 1;
+    int number_of_simulation_iterations = 16384;
     learn(max_time_steps, number_of_iterations, number_of_simulation_iterations);
     return 0;
 }

@@ -16,6 +16,7 @@ import math
 import time
 from gravity import approximate, gravity
 from copy import copy, deepcopy
+import json
 
 def print_policy_heatmap(policy):
     for i in range(0, 128, 8):
@@ -42,6 +43,16 @@ def overfitting_warning(args, system, number_of_inputs, hidden_layer_size, outpu
 
 def distance(position1, position2):
     return max(np.sqrt((position1[0]-position2[0])**2+(position1[1]-position2[1])**2),1)
+
+def read_data_from_file(filename):
+    with open('./Gravity/data/' + filename, 'r') as file:
+        memory = json.loads(file.read())
+    for i in range(len(memory)):
+        memory[i][0] = np.array(memory[i][0]).astype(np.float32)
+        memory[i][1] = np.array(memory[i][1])
+        memory[i] = ((memory[i][0], memory[i][1]))
+    
+    return memory
 
 class Space:
     def __init__(self):
@@ -334,12 +345,15 @@ class GravityAI:
         for iteration in range(self.args['num_iterations']):
             memory = []
             
-            self.model.eval()
-            for simulation_iteration in range(self.args['num_simulation_iterations']):
-                simulation_start = time.time()
-                memory += self.simulation()
-                simulation_timer += time.time()-simulation_start
-                print(f"{iteration+1}/{self.args['num_iterations']}: {100*(simulation_iteration+1)/self.args['num_simulation_iterations']}%, estimated time left: {time_left(self.args, simulation_timer, iteration, simulation_iteration, training_timer, 0)}s")
+            if(self.args['read_from_file']):
+                memory = read_data_from_file("simulation.json")
+            else:
+                self.model.eval()
+                for simulation_iteration in range(self.args['num_simulation_iterations']):
+                    simulation_start = time.time()
+                    memory += self.simulation()
+                    simulation_timer += time.time()-simulation_start
+                    print(f"{iteration+1}/{self.args['num_iterations']}: {100*(simulation_iteration+1)/self.args['num_simulation_iterations']}%, estimated time left: {time_left(self.args, simulation_timer, iteration, simulation_iteration, training_timer, 0)}s")
                 
             self.model.train()
             for epoch in range(self.args['num_epochs']):
