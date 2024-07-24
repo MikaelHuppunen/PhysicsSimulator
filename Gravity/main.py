@@ -27,7 +27,7 @@ total_energy_at_start = total_energy(mass, velocity, position, space.gravitation
 args = {
     'search': True,
 }
-model_dict = "./Gravity/models/model_0_Space.pt"
+model_dict = "./models/model_0_Space.pt"
 
 pygame.init()
 

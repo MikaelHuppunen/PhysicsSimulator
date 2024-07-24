@@ -45,12 +45,13 @@ def distance(position1, position2):
     return max(np.sqrt((position1[0]-position2[0])**2+(position1[1]-position2[1])**2),1)
 
 def read_data_from_file(filename):
-    with open('./Gravity/data/' + filename, 'r') as file:
+    with open('./data/' + filename, 'r') as file:
         memory = json.loads(file.read())
     for i in range(len(memory)):
         memory[i][0] = np.array(memory[i][0]).astype(np.float32)
         memory[i][1] = np.array(memory[i][1])
         memory[i] = ((memory[i][0], memory[i][1]))
+    print("Data read successfully")
     
     return memory
 
@@ -254,6 +255,7 @@ class ResBlock(nn.Module):
         return x
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
     
 class GravityAI:
     def __init__(self, model, optimizer, system, args):
@@ -327,7 +329,7 @@ class GravityAI:
 
             out_policy = self.model(state)
             squared_difference = (policy_targets-out_policy) ** 2
-            loss = squared_difference.sum()
+            loss = squared_difference.mean()
             
             self.optimizer.zero_grad()
             loss.backward()
@@ -362,8 +364,8 @@ class GravityAI:
                 training_timer += time.time()-training_start
                 print(f"{100*(epoch+1)/self.args['num_epochs']}%, estimated time left: {time_left(self.args, simulation_timer, iteration, self.args['num_simulation_iterations']-1, training_timer, epoch)}s")
             
-            torch.save(self.model.state_dict(), f"./Gravity/models/model_{iteration}_{self.system}.pt")
-            #torch.save(self.optimizer.state_dict(), f"./Gravity/models/optimizer_{iteration}_{self.system}.pt")
+            torch.save(self.model.state_dict(), f"./models/model_{iteration}_{self.system}.pt")
+            #torch.save(self.optimizer.state_dict(), f"./models/optimizer_{iteration}_{self.system}.pt")
 
 def learn(args, system):
     model = ResNet(system, 8, 128, device=device, number_of_inputs=12)
